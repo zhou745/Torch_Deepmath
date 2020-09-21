@@ -1,0 +1,1 @@
+from TorchDeepmath.Model import GNN
