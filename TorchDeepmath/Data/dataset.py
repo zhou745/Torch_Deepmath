@@ -5,9 +5,10 @@ import random
 
 class GNN_dataset(Dataset):
     def __init__(self,goal_path,neg_thm_path,params):
-
+        super(GNN_dataset,self).__init__()
         self.goal_list = np.load(goal_path,allow_pickle=True).tolist()
         self.neg_thm_list = np.load(neg_thm_path,allow_pickle=True).tolist()
+        print("dataset loading finished!")
 
         self.len_goal = len(self.goal_list)
         self.len_neg_thm = len(self.neg_thm_list)

@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import torch.nn.init as init
 import torch_scatter
 import numpy as np
+import torch.distributed as dist
 
 class Toynet(nn.Module):
     def __init__(self):
@@ -42,7 +43,7 @@ class MLP(nn.Module):
             nn.ReLU(),
             nn.Linear(layer_size[0],layer_size[1]),
             nn.ReLU(),
-            nn.Dropout(p=0.5)
+            nn.Dropout(p=0)
         )
         
         for p in self.model.parameters():
@@ -90,6 +91,7 @@ class GNN(nn.Module):
             input_parent_batch = torch.cat([node_parent_batch,node_self_batch, edge_out],-1)
             input_child_batch = torch.cat([node_self_batch,node_parent_batch, edge_in],-1)
 
+            
             S_p = self.MLP_p(input_parent_batch)
             S_c = self.MLP_c(input_child_batch)
 
@@ -98,16 +100,9 @@ class GNN(nn.Module):
 
             S_p=S_p + root_mask.view(-1,1)*start_token
             S_c=S_c + leaf_mask.view(-1,1)*end_token
-            # torch.cuda.synchronize()
-            # print("########################################")
-            # print(S_p.device,flush=True)
-            # print(batch_token.device,flush=True)
-            # print(S_c.device,flush=True)
-            # print("########################################")
-            # torch.cuda.synchronize()
 
             x_aggr = torch.cat([hidden_state,S_p,S_c],-1)
-            hidden_state = self.MLP_aggr(x_aggr)
+            hidden_state = hidden_state+self.MLP_aggr(x_aggr)
 
         return(hidden_state)
 
@@ -117,13 +112,14 @@ class Neck(nn.Module):
 
         self.embed_size = embed_size
         self.filters=filters
+        
        
         self.model = nn.Sequential(
             nn.Linear(self.embed_size,self.filters[0]),
             nn.ReLU(),
             nn.Linear(self.filters[0],self.filters[1]),
             nn.ReLU(),
-            nn.Dropout(p=0.3)
+            nn.Dropout(p=0)
         )
 
         for p in self.model.parameters():
@@ -148,9 +144,8 @@ class Tactic_Classifier(nn.Module):
             nn.ReLU(),
             nn.Linear(self.hidden_layers[0],self.hidden_layers[1]),
             nn.ReLU(),
-            nn.Dropout(p=0.3),
-            nn.Linear(self.hidden_layers[1],self.hidden_layers[2]),
-            nn.Softmax(dim=1)
+            nn.Dropout(p=0),
+            nn.Linear(self.hidden_layers[1],self.hidden_layers[2])
         )
 
         for p in self.model.parameters():
@@ -171,7 +166,7 @@ class Theom_logit(nn.Module):
             nn.ReLU(),
             nn.Linear(self.hidden_layers[0],self.hidden_layers[1]),
             nn.ReLU(),
-            nn.Dropout(p=0.3),
+            nn.Dropout(p=0),
             nn.Linear(self.hidden_layers[1],self.hidden_layers[2])
         )
 
@@ -225,20 +220,25 @@ class GNN_net(nn.Module):
 
         #get auc pos gather idx
         
-    
-    def aucloss(self,logits,gt_tactic):
+    def regulizer(self):
+        loss = 0
+        for p in self.parameters():
+            loss += p.norm()
+        return(loss*1e-7)
+
+    def aucloss(self,logits):
         #compute pos 
         num_goal,num_thm,_ = logits.shape
         offset_num = num_thm//num_goal
-
+        assert num_thm%num_goal==0
         logits_flat = logits.view(-1)
-        tmp = np.zeros([logits_flat.shape[0]],dtype=np.int64)
-        for idx in range(gt_tactic.shape[0]):
-            tmp[idx*num_thm+idx*offset_num]=1
+        tmp = np.zeros([logits_flat.shape[0]],dtype=np.float32)
+        for idx in range(num_goal):
+            tmp[idx*num_thm+idx*offset_num]=1.
         
         device = logits.device
-        choose_pos = torch.tensor(tmp==1).to(device)
-        choose_neg = torch.tensor(tmp==0).to(device)
+        choose_pos = torch.tensor(tmp>0.5).to(device)
+        choose_neg = torch.tensor(tmp<0.5).to(device)
 
         pos_logits = logits_flat[choose_pos].view(-1,1)
         neg_logits = logits_flat[choose_neg].view(1,-1)
@@ -256,15 +256,26 @@ class GNN_net(nn.Module):
         device = tactic_scores.device
         logits_gt = torch.tensor(tmp).to(device)
 
-        tactic_loss =F.cross_entropy(tactic_scores,gt_tactic,reduction='mean')
+        tactic_loss =F.cross_entropy(tactic_scores,gt_tactic,reduction='sum')
+        # dist.barrier()
+        # device = tactic_scores.device
+        # if device.index==0:
+        #     _,indice = torch.topk(F.softmax(tactic_scores)[0], 5)
+        #     print(indice,flush=True)
+        #     print(gt_tactic,flush=True)
+        # dist.barrier()
+        score_loss = F.binary_cross_entropy(torch.sigmoid(logits),logits_gt,reduction='sum')
 
-        score_loss = F.binary_cross_entropy(F.sigmoid(logits),logits_gt,reduction='mean')
+        auc_loss = self.aucloss(logits)
 
-        auc_loss = self.aucloss(logits,gt_tactic)
+        score_loss = score_loss*batch_current*self.score_weight
+        tactic_loss = tactic_loss*self.tactic_weight
+        auc_loss = auc_loss*batch_current*self.auc_weight
 
         # print(tactic_loss,flush=True)
         # loss = 0.
-        loss = score_loss*self.score_weight+tactic_loss*self.tactic_weight+auc_loss*self.auc_weight
+        loss = score_loss+tactic_loss+auc_loss
+        # loss +=self.regulizer()
         return(loss,tactic_loss,score_loss,auc_loss)
     
     def forward(self,input):
@@ -292,10 +303,10 @@ class GNN_net(nn.Module):
         tactic_scores = self.tactic_head(goal_neck_state)
         logits = self.logit_head(goal_neck_state,thm_neck_state)
 
-        if self.train:
+        if self.training:
             return(self.loss(tactic_scores,logits,input['tac_id']))
         else:
-            return({'tactic_scores':tactic_scores,'logits':logits})
+            return({'tactic_scores':F.softmax(tactic_scores,dim=1),'logits':logits})
 
 
         

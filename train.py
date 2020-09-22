@@ -2,7 +2,7 @@ import TorchDeepmath as td
 import torch
 from tqdm import tqdm
 import os
-os.environ['CUDA_VISIBLE_DEVICES']="0,1"
+os.environ['CUDA_VISIBLE_DEVICES']="6,7"
 # td.Data.gen_from_tfrecord.tfgen("/mnt/lustre/zhoujingqiu/deephol-data/deepmath/deephol/proofs/human/",
 #                                 "/mnt/cache/zhoujingqiu/data_goal2")
 # td.Data.gen_from_tfrecord.text_gen("/mnt/lustre/zhoujingqiu/deephol-data/deepmath/deephol/proofs/human/",
@@ -32,7 +32,7 @@ if __name__ == '__main__':
     word_size = 2
     save_name="/mnt/cache/share_data/zhoujingqiu/ckpt/exp5/model_epoch"
 
-    dataset = td.Data.dataset.GNN_dataset("../data/data_goal2.npy","../data/data_thm2.npy",{'neg_per_pos':neg_per_pos,'neg_hard_per_pos':neg_hard_per_pos})
+    dataset = td.Data.dataset.GNN_dataset("../data/data_goal.npy","../data/data_thm.npy",{'neg_per_pos':neg_per_pos,'neg_hard_per_pos':neg_hard_per_pos})
 
     model = td.Model.GNN.GNN_net({
         'goal_voc_length':1109,
@@ -40,7 +40,7 @@ if __name__ == '__main__':
         'thm_voc_length':1193,
         'thm_voc_embedsize':128,
         'num_hops':12,
-        'score_weight':0.2,
+        'score_weight':0.2/16,
         'tactic_weight':1.0,
         'auc_weight':4.0,
         'neg_per_pos':neg_per_pos,
