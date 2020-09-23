@@ -43,7 +43,7 @@ class MLP(nn.Module):
             nn.ReLU(),
             nn.Linear(layer_size[0],layer_size[1]),
             nn.ReLU(),
-            nn.Dropout(p=0)
+            nn.Dropout(p=0.3)
         )
         
         for p in self.model.parameters():
@@ -119,7 +119,7 @@ class Neck(nn.Module):
             nn.ReLU(),
             nn.Linear(self.filters[0],self.filters[1]),
             nn.ReLU(),
-            nn.Dropout(p=0)
+            nn.Dropout(p=0.2)
         )
 
         for p in self.model.parameters():
@@ -144,7 +144,7 @@ class Tactic_Classifier(nn.Module):
             nn.ReLU(),
             nn.Linear(self.hidden_layers[0],self.hidden_layers[1]),
             nn.ReLU(),
-            nn.Dropout(p=0),
+            nn.Dropout(p=0.2),
             nn.Linear(self.hidden_layers[1],self.hidden_layers[2])
         )
 
@@ -166,7 +166,7 @@ class Theom_logit(nn.Module):
             nn.ReLU(),
             nn.Linear(self.hidden_layers[0],self.hidden_layers[1]),
             nn.ReLU(),
-            nn.Dropout(p=0),
+            nn.Dropout(p=0.2),
             nn.Linear(self.hidden_layers[1],self.hidden_layers[2])
         )
 
@@ -237,13 +237,15 @@ class GNN_net(nn.Module):
             tmp[idx*num_thm+idx*offset_num]=1.
         
         device = logits.device
+
         choose_pos = torch.tensor(tmp>0.5).to(device)
         choose_neg = torch.tensor(tmp<0.5).to(device)
 
         pos_logits = logits_flat[choose_pos].view(-1,1)
         neg_logits = logits_flat[choose_neg].view(1,-1)
-
-        auc_loss = torch.mean(torch.log((torch.exp(-(pos_logits-neg_logits))+1)))
+        
+        delta = torch.clamp(pos_logits-neg_logits, min=-5., max=99999.)
+        auc_loss = torch.mean(torch.log((torch.exp(-delta)+1)))
 
         return(auc_loss)
 
@@ -256,7 +258,7 @@ class GNN_net(nn.Module):
         device = tactic_scores.device
         logits_gt = torch.tensor(tmp).to(device)
 
-        tactic_loss =F.cross_entropy(tactic_scores,gt_tactic,reduction='sum')
+        tactic_loss =F.cross_entropy(tactic_scores,gt_tactic,reduction='mean')
         # dist.barrier()
         # device = tactic_scores.device
         # if device.index==0:
@@ -264,13 +266,13 @@ class GNN_net(nn.Module):
         #     print(indice,flush=True)
         #     print(gt_tactic,flush=True)
         # dist.barrier()
-        score_loss = F.binary_cross_entropy(torch.sigmoid(logits),logits_gt,reduction='sum')
+        score_loss = F.binary_cross_entropy(torch.sigmoid(logits),logits_gt,reduction='mean')
 
         auc_loss = self.aucloss(logits)
 
-        score_loss = score_loss*batch_current*self.score_weight
+        score_loss = score_loss*self.score_weight
         tactic_loss = tactic_loss*self.tactic_weight
-        auc_loss = auc_loss*batch_current*self.auc_weight
+        auc_loss = auc_loss*self.auc_weight
 
         # print(tactic_loss,flush=True)
         # loss = 0.

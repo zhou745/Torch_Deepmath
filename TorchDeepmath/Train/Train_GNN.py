@@ -30,7 +30,7 @@ def model_parallel(rank, world_size,dataset,model,batch_size,save_name):
     data_loader = torch.utils.data.DataLoader(dataset,batch_size=batch_size//world_size,
                                                             collate_fn=Batch_collect,
                                                             sampler=sampler,
-                                                            num_workers=4)
+                                                            num_workers=8)
     print("loader build finished",flush=True) 
 
     if rank==0:
@@ -43,7 +43,7 @@ def model_parallel(rank, world_size,dataset,model,batch_size,save_name):
     
     idx = 0 
     model_new.train(True)
-    optimizer=optim.Adam(model_new.parameters(), lr=1e-4, betas=(0.9, 0.999), eps=1e-08, weight_decay=0, amsgrad=False)
+    optimizer=optim.Adam(model_new.parameters(), lr=8e-4, betas=(0.9, 0.999), eps=1e-08, weight_decay=0, amsgrad=False)
     while True:
         sampler.set_epoch(idx)
         for item in tqdm(data_loader):
@@ -103,6 +103,7 @@ def ValLoop(dataset,model,save_name):
         new_state_dict[name] = v
 
     model.load_state_dict(new_state_dict)
+
     device = torch.device('cuda:0')
     model.to(device)
     model.train(False)
@@ -110,6 +111,7 @@ def ValLoop(dataset,model,save_name):
     N_all = 0
     N_true_tac = 0
     N_true_sco = 0
+    N_true_sample = 0
     for item in tqdm(data_loader):
         for k in item.keys():
             item[k]=item[k].to(device)
@@ -128,9 +130,13 @@ def ValLoop(dataset,model,save_name):
 
         if score_top1==0:
             N_true_sco+=1
+
+        if score_top1==0 and gt in tac_topk:
+            N_true_sample+=1
         N_all+=1
     print("tac acuracy is %f"%(N_true_tac/N_all))
     print("score acuracy is %f"%(N_true_sco/N_all))
+    print("sample acuracy is %f"%(N_true_sample/N_all))
 
 
 
