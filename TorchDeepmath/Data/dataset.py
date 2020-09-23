@@ -8,6 +8,8 @@ class GNN_dataset(Dataset):
         super(GNN_dataset,self).__init__()
         self.goal_list = np.load(goal_path,allow_pickle=True).tolist()
         self.neg_thm_list = np.load(neg_thm_path,allow_pickle=True).tolist()
+        # self.goal_list = np.load(goal_path,allow_pickle=True)
+        # self.neg_thm_list = np.load(neg_thm_path,allow_pickle=True)
         print("dataset loading finished!")
 
         self.len_goal = len(self.goal_list)
@@ -68,6 +70,12 @@ class GNN_dataset(Dataset):
         thm_parent_idx = np.concatenate(thm_parent_idx_l,axis=0)
         thm_root_mask = np.concatenate(thm_root_mask_l,axis=0)
         thm_leaf_mask = np.concatenate(thm_leaf_mask_l,axis=0)
+
+        del thm_token_l
+        del thm_self_index_p_l
+        del thm_parent_idx_l
+        del thm_root_mask_l
+        del thm_leaf_mask_l
 
         # neg_items = random.sample(self.neg_thm_list,self.params['neg_per_pos'])
         output = {
@@ -154,6 +162,17 @@ def Batch_collect(batch):
     length_list_t = np.array(length_list_t)
     length_list_g = np.array(length_list_g)
 
+    del goal_token_l
+    del goal_self_index_p_l
+    del goal_parent_idx_l
+    del goal_root_mask_l
+    del goal_leaf_mask_l
+    del thm_token_l
+    del thm_self_index_p_l
+    del thm_parent_idx_l
+    del thm_root_mask_l
+    del thm_leaf_mask_l
+
 
     tac_id = np.concatenate(tac_id_l,axis=0)
     #compute gather idx
@@ -177,4 +196,22 @@ def Batch_collect(batch):
         'length_list_g':as_tensor(length_list_g),
         'length_list_t':as_tensor(length_list_t)
     }
+
+    del goal_token
+    del goal_self_index_p
+    del goal_parent_idx
+    del goal_root_mask
+    del goal_leaf_mask
+    del thm_token
+    del thm_self_index_p
+    del thm_parent_idx
+    del thm_root_mask
+    del thm_leaf_mask
+    del tac_id
+    del idx_gather_goal
+    del idx_gather_thm
+    del length_list_g
+    del length_list_t
+
+
     return(output)

@@ -21,16 +21,16 @@ def cleanup():
 
 def model_parallel(rank, world_size,dataset,model,batch_size,save_name):
     # device = 'cuda'
+    print("current rank is %d"%(rank),flush=True)
     setup(rank, world_size)
 
     model_new = model.to(rank)
-    model_new = DDP(model_new,device_ids=[rank],find_unused_parameters=True)
+    model_new = DDP(model_new,device_ids=[rank])
 
     sampler = torch.utils.data.distributed.DistributedSampler(dataset,shuffle=True, seed=123456)
     data_loader = torch.utils.data.DataLoader(dataset,batch_size=batch_size//world_size,
                                                             collate_fn=Batch_collect,
-                                                            sampler=sampler,
-                                                            num_workers=8)
+                                                            sampler=sampler)
     print("loader build finished",flush=True) 
 
     if rank==0:
@@ -43,12 +43,17 @@ def model_parallel(rank, world_size,dataset,model,batch_size,save_name):
     
     idx = 0 
     model_new.train(True)
-    optimizer=optim.Adam(model_new.parameters(), lr=8e-4, betas=(0.9, 0.999), eps=1e-08, weight_decay=0, amsgrad=False)
+    optimizer=optim.Adam(model_new.parameters(), lr=1.6e-3, betas=(0.9, 0.999), eps=1e-08, weight_decay=0, amsgrad=False)
     while True:
+        print("set epoch ",flush=True)
         sampler.set_epoch(idx)
+        print("set epoch finished",flush=True)
+        dist.barrier()
         for item in tqdm(data_loader):
-            
-            loss,tactic_loss,score_loss,auc_loss = model_new(item)
+            # pass
+            tactic_loss,score_loss,auc_loss,reg_loss = model_new(item)
+
+            loss=tactic_loss+ score_loss+auc_loss+reg_loss
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -75,7 +80,7 @@ def model_parallel(rank, world_size,dataset,model,batch_size,save_name):
                         " tactic "+str(tactic_out.item())+
                         " score "+str(score_out.item())+
                         " auc "+str(auc_out.item()),flush=True)
-        # dist.barrier()
+        dist.barrier()
 
 
         for g in optimizer.param_groups:
@@ -119,6 +124,7 @@ def ValLoop(dataset,model,save_name):
 
         tactic = result['tactic_scores']
         score = result['logits'].view(-1)
+        # print(torch.sigmoid(score),flush=True)
 
 
         gt = item['tac_id'].item()

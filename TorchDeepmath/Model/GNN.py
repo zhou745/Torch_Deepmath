@@ -79,7 +79,7 @@ class GNN(nn.Module):
 
         edge_in = edge_in.expand(Num_edge,-1)
         edge_out = edge_out.expand(Num_edge,-1)
-        hidden_state = batch_token
+        hidden_state = self.MLP_V(batch_token)
         
         #main gnn loops
         for hop in range(self.num_hops):
@@ -221,10 +221,10 @@ class GNN_net(nn.Module):
         #get auc pos gather idx
         
     def regulizer(self):
-        loss = 0
+        loss=0.
         for p in self.parameters():
-            loss += p.norm()
-        return(loss*1e-7)
+            loss+=p.norm()
+        return(loss)
 
     def aucloss(self,logits):
         #compute pos 
@@ -244,8 +244,15 @@ class GNN_net(nn.Module):
         pos_logits = logits_flat[choose_pos].view(-1,1)
         neg_logits = logits_flat[choose_neg].view(1,-1)
         
-        delta = torch.clamp(pos_logits-neg_logits, min=-5., max=99999.)
-        auc_loss = torch.mean(torch.log((torch.exp(-delta)+1)))
+        delta = pos_logits-neg_logits
+        # delta = F.leaky_relu(pos_logits-neg_logits, negative_slope=0.001, inplace=False)
+        # delta = torch.clamp(pos_logits-neg_logits, min=-5., max=99999.)
+        # auc_loss = torch.mean(-torch.log((torch.exp(-delta)+1)))
+        auc_loss = torch.mean(-torch.log(torch.sigmoid(delta)*(1-1e-4)+1e-20))
+
+        #raise positive logits by force
+        auc_loss+= torch.mean(1-torch.sigmoid(pos_logits))
+        auc_loss+= torch.mean(torch.sigmoid(neg_logits))
 
         return(auc_loss)
 
@@ -276,9 +283,11 @@ class GNN_net(nn.Module):
 
         # print(tactic_loss,flush=True)
         # loss = 0.
-        loss = score_loss+tactic_loss+auc_loss
-        # loss +=self.regulizer()
-        return(loss,tactic_loss,score_loss,auc_loss)
+        # loss = score_loss+tactic_loss+auc_loss
+        # reg_loss =self.regulizer()*1e-4
+
+        reg_loss = 0.
+        return(tactic_loss,score_loss,auc_loss,reg_loss)
     
     def forward(self,input):
         batch_goal_token = self.goal_embed(input['goal_token'])
