@@ -6,6 +6,9 @@ import torch_scatter
 import numpy as np
 import torch.distributed as dist
 
+init_a = -0.1
+init_b = 0.1
+
 class Toynet(nn.Module):
     def __init__(self):
         super(Toynet, self).__init__()
@@ -28,7 +31,7 @@ class Tokenstore(nn.Module):
                                                                                            dtype=torch.float32)))
 
         if initializer==None:
-            init.uniform_(self.tokenvectors, a=-0.1, b=0.1)
+            init.uniform_(self.tokenvectors, a=init_a, b=init_b)
     
     def forward(self,token_idx):
         batch_tokens = self.tokenvectors[token_idx,:]
@@ -47,7 +50,7 @@ class MLP(nn.Module):
         )
         
         for p in self.model.parameters():
-            init.uniform_(p, a=-0.1, b=0.1)
+            init.uniform_(p, a=init_a, b=init_b)
         
     
     def forward(self,input):
@@ -80,6 +83,8 @@ class GNN(nn.Module):
         edge_in = edge_in.expand(Num_edge,-1)
         edge_out = edge_out.expand(Num_edge,-1)
         hidden_state = self.MLP_V(batch_token)
+        # print(batch_token,flush=True)
+        # print(hidden_state,flush=True)
         
         #main gnn loops
         for hop in range(self.num_hops):
@@ -97,7 +102,9 @@ class GNN(nn.Module):
 
             S_p = torch_scatter.scatter_mean(S_p,self_idx_batch,dim=0,dim_size=Num_node)
             S_c = torch_scatter.scatter_mean(S_c,parent_idx_batch,dim=0,dim_size=Num_node)
-
+            # print(parent_idx_batch,flush=True)
+            # print(self_idx_batch,flush=True)
+            # print(parent_idx_batch.shape[0],flush=True)
             S_p=S_p + root_mask.view(-1,1)*start_token
             S_c=S_c + leaf_mask.view(-1,1)*end_token
 
@@ -117,17 +124,22 @@ class Neck(nn.Module):
         self.model = nn.Sequential(
             nn.Linear(self.embed_size,self.filters[0]),
             nn.ReLU(),
+            nn.Dropout(p=0.2),
             nn.Linear(self.filters[0],self.filters[1]),
-            nn.ReLU(),
-            nn.Dropout(p=0.2)
+            nn.ReLU()
         )
 
         for p in self.model.parameters():
-            init.uniform_(p, a=-0.1, b=0.1)
+            init.uniform_(p, a=init_a, b=init_b)
 
     def forward(self,batch_gnn_embed,gather_idx,num_graph):
+        # print(batch_gnn_embed,flush=True)
         batch_neck_allnode = self.model(batch_gnn_embed)
-        batch_neck_graph,_ = torch_scatter.scatter_max(batch_neck_allnode,gather_idx,dim=0,dim_size=num_graph)
+
+        batch_neck_graph,idx_ = torch_scatter.scatter_max(batch_neck_allnode,gather_idx,dim=0,dim_size=num_graph)
+        # print(batch_neck_allnode,flush=True)
+        # print(batch_neck_graph,flush=True) 
+        # print(idx_,flush=True)
         return(batch_neck_graph)
         
 
@@ -149,7 +161,7 @@ class Tactic_Classifier(nn.Module):
         )
 
         for p in self.model.parameters():
-            init.uniform_(p, a=-0.1, b=0.1)
+            init.uniform_(p, a=init_a, b=init_b)
     
     def forward(self,batch_goal_neck):
         return(self.model(batch_goal_neck))
@@ -164,14 +176,14 @@ class Theom_logit(nn.Module):
         self.model = nn.Sequential(
             nn.Linear(self.embed_size*3,self.hidden_layers[0]),
             nn.ReLU(),
+            nn.Dropout(p=0.2),
             nn.Linear(self.hidden_layers[0],self.hidden_layers[1]),
             nn.ReLU(),
-            nn.Dropout(p=0.2),
             nn.Linear(self.hidden_layers[1],self.hidden_layers[2])
         )
 
         for p in self.model.parameters():
-            init.uniform_(p, a=-0.1, b=0.1)
+            init.uniform_(p, a=init_a, b=init_b)
 
     def forward(self,batch_goal,batch_thm):
         batch_goal_reshaped = batch_goal.view(-1,1,self.embed_size)
@@ -245,14 +257,15 @@ class GNN_net(nn.Module):
         neg_logits = logits_flat[choose_neg].view(1,-1)
         
         delta = pos_logits-neg_logits
-        # delta = F.leaky_relu(pos_logits-neg_logits, negative_slope=0.001, inplace=False)
-        # delta = torch.clamp(pos_logits-neg_logits, min=-5., max=99999.)
-        # auc_loss = torch.mean(-torch.log((torch.exp(-delta)+1)))
-        auc_loss = torch.mean(-torch.log(torch.sigmoid(delta)*(1-1e-4)+1e-20))
+        #delta = F.leaky_relu(pos_logits-neg_logits, negative_slope=0.01, inplace=False)
+
+        delta = torch.clamp(delta, min=-80., max=80.)
+        auc_loss = torch.mean(torch.log((torch.exp(-delta)+1)))
+        # auc_loss = torch.mean(-torch.log(torch.sigmoid(delta)*(1-1e-4)+1e-20))
 
         #raise positive logits by force
-        auc_loss+= torch.mean(1-torch.sigmoid(pos_logits))
-        auc_loss+= torch.mean(torch.sigmoid(neg_logits))
+        # auc_loss+= torch.mean(1-torch.sigmoid(pos_logits))
+        # auc_loss+= torch.mean(torch.sigmoid(neg_logits))*0.2
 
         return(auc_loss)
 
@@ -264,15 +277,17 @@ class GNN_net(nn.Module):
         
         device = tactic_scores.device
         logits_gt = torch.tensor(tmp).to(device)
+        # print(tactic_scores,flush=True)
 
         tactic_loss =F.cross_entropy(tactic_scores,gt_tactic,reduction='mean')
-        # dist.barrier()
-        # device = tactic_scores.device
-        # if device.index==0:
-        #     _,indice = torch.topk(F.softmax(tactic_scores)[0], 5)
-        #     print(indice,flush=True)
-        #     print(gt_tactic,flush=True)
-        # dist.barrier()
+        # batch,channel = tactic_scores.shape
+
+        # gt_numpy = np.zeros([batch,channel],dtype=np.float32)
+        # for b in range(batch):
+        #     gt_numpy[b,gt_tactic[b].item()]=1.
+        # gt_torch = torch.tensor(gt_numpy).to(device)
+        # tactic_loss =F.binary_cross_entropy(torch.sigmoid(tactic_scores),gt_torch,reduction='mean')
+
         score_loss = F.binary_cross_entropy(torch.sigmoid(logits),logits_gt,reduction='mean')
 
         auc_loss = self.aucloss(logits)
@@ -306,6 +321,10 @@ class GNN_net(nn.Module):
         thm_hidden_state = self.GNN_thm(batch_thm_token,input['thm_self_index_p'],
                                         input['thm_parent_idx'],input['thm_root_mask'],
                                         input['thm_leaf_mask'],thm_start_token,thm_end_token)
+
+        # thm_hidden_state = self.GNN_goal(batch_thm_token,input['thm_self_index_p'],
+        #                                 input['thm_parent_idx'],input['thm_root_mask'],
+        #                                 input['thm_leaf_mask'],thm_start_token,thm_end_token)
 
 
         goal_neck_state = self.neck_goal(goal_hidden_state,input['idx_gather_goal'],input['length_list_g'].shape[0])

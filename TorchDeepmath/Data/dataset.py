@@ -104,7 +104,7 @@ def get_gather_idx(length_list):
     idx = 0
     offset=0
     for item in length_list:
-        idx_gather[offset:item]=idx
+        idx_gather[offset:item+offset]=idx
         idx+=1
         offset+=item
     return(idx_gather)
@@ -144,6 +144,9 @@ def Batch_collect(batch):
         tac_id_l.append([b['tac_id']])
         offset_g+=b['goal_token'].shape[0]
         offset_t+=b['thm_token'].shape[0]
+        # print(b['goal_parent_idx'],flush=True)
+        # print(b['goal_self_index_p'],flush=True)
+        # print(b['goal_token'].shape[0])
         length_list_t +=b['length_list_t']
         length_list_g.append(b['goal_token'].shape[0])
 

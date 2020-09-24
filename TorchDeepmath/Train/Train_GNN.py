@@ -9,20 +9,20 @@ from TorchDeepmath.Data.dataset import Batch_collect
 from collections import OrderedDict
 
 
-def setup(rank, world_size,name='nccl'):
+def setup(rank, address,world_size,name='nccl'):
     os.environ['MASTER_ADDR'] = 'localhost'
-    os.environ['MASTER_PORT'] = '12355'
-
+    os.environ['MASTER_PORT'] = address
+    # os.environ['MASTER_PORT'] = '78902'
     # initialize the process group
     dist.init_process_group(name, rank=rank, world_size=world_size)
 
 def cleanup():
     dist.destroy_process_group()
 
-def model_parallel(rank, world_size,dataset,model,batch_size,save_name):
+def model_parallel(rank, world_size,dataset,model,batch_size,save_name,address):
     # device = 'cuda'
     print("current rank is %d"%(rank),flush=True)
-    setup(rank, world_size)
+    setup(rank,address, world_size)
 
     model_new = model.to(rank)
     model_new = DDP(model_new,device_ids=[rank])
@@ -43,7 +43,7 @@ def model_parallel(rank, world_size,dataset,model,batch_size,save_name):
     
     idx = 0 
     model_new.train(True)
-    optimizer=optim.Adam(model_new.parameters(), lr=1.6e-3, betas=(0.9, 0.999), eps=1e-08, weight_decay=0, amsgrad=False)
+    optimizer=optim.Adam(model_new.parameters(), lr=1e-3, betas=(0.9, 0.999), eps=1e-08, weight_decay=0, amsgrad=False)
     while True:
         print("set epoch ",flush=True)
         sampler.set_epoch(idx)
@@ -92,9 +92,9 @@ def model_parallel(rank, world_size,dataset,model,batch_size,save_name):
     cleanup()
 
 
-def TrainLoop(dataset,model,world_size,batch_size,save_name):
+def TrainLoop(dataset,model,world_size,batch_size,save_name,address):
     if world_size>0:
-        train_multi_gpu(dataset,model,world_size,batch_size,save_name)
+        train_multi_gpu(dataset,model,world_size,batch_size,save_name,address)
 
 def ValLoop(dataset,model,save_name):
     data_loader = torch.utils.data.DataLoader(dataset,batch_size=1,
@@ -129,6 +129,7 @@ def ValLoop(dataset,model,save_name):
 
         gt = item['tac_id'].item()
         _,tac_topk = torch.topk(tactic,5)
+        # print(tac_topk,flush=True)
         _,score_top1 = torch.topk(score,1)
         
         if gt in tac_topk:
@@ -146,9 +147,9 @@ def ValLoop(dataset,model,save_name):
 
 
 
-def train_multi_gpu(dataset,model,world_size,batch_size,save_name):
+def train_multi_gpu(dataset,model,world_size,batch_size,save_name,address):
 
-    mp.spawn(model_parallel,args=(world_size,dataset,model,batch_size,save_name),
+    mp.spawn(model_parallel,args=(world_size,dataset,model,batch_size,save_name,address),
                             nprocs=world_size,
                             join=True)
     
