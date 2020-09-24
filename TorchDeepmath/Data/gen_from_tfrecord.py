@@ -56,10 +56,12 @@ def GetData_from_TF(files,Queue_raw,num_worker):
     dataset = dataset.map(parse)
     idx = 0
     for item in dataset:
-        Queue_raw.put(item)
         idx+=1
-        if idx>1000:
+        if idx<37000:
+            continue
+        if idx>38000:
             break
+        Queue_raw.put(item)
     
     #signal all worker that job is down
     for idx in range(num_worker):
@@ -104,10 +106,13 @@ def Get_data_from_file(files,Queue_raw,num_worker):
     dataset = tf.data.TextLineDataset(files)
     idx=0
     for item in dataset:
-        Queue_raw.put(item)
+
         idx+=1
-        if idx>1000:
+        if idx<1000:
+            continue
+        if idx>2000:
             break
+        Queue_raw.put(item)
     
     #signal all worker that job is down
     for idx in range(num_worker):
