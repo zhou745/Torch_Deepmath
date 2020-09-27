@@ -46,7 +46,7 @@ class MLP(nn.Module):
             nn.ReLU(),
             nn.Linear(layer_size[0],layer_size[1]),
             nn.ReLU(),
-            nn.Dropout(p=0.3)
+            nn.Dropout(p=0.5)
         )
         
         for p in self.model.parameters():
@@ -124,7 +124,6 @@ class Neck(nn.Module):
         self.model = nn.Sequential(
             nn.Linear(self.embed_size,self.filters[0]),
             nn.ReLU(),
-            nn.Dropout(p=0.2),
             nn.Linear(self.filters[0],self.filters[1]),
             nn.ReLU()
         )
@@ -152,11 +151,13 @@ class Tactic_Classifier(nn.Module):
         self.hidden_layers = hidden_layers
 
         self.model = nn.Sequential(
+            nn.Dropout(p=0.3),
             nn.Linear(self.input_size,self.hidden_layers[0]),
             nn.ReLU(),
+            nn.Dropout(p=0.3),
             nn.Linear(self.hidden_layers[0],self.hidden_layers[1]),
             nn.ReLU(),
-            nn.Dropout(p=0.2),
+            nn.Dropout(p=0.3),
             nn.Linear(self.hidden_layers[1],self.hidden_layers[2])
         )
 
@@ -174,11 +175,13 @@ class Theom_logit(nn.Module):
         self.hidden_layers = hidden_layers
       
         self.model = nn.Sequential(
+            nn.Dropout(p=0.3),
             nn.Linear(self.embed_size*3,self.hidden_layers[0]),
             nn.ReLU(),
-            nn.Dropout(p=0.2),
+            nn.Dropout(p=0.3),
             nn.Linear(self.hidden_layers[0],self.hidden_layers[1]),
             nn.ReLU(),
+            nn.Dropout(p=0.3),
             nn.Linear(self.hidden_layers[1],self.hidden_layers[2])
         )
 
@@ -257,7 +260,7 @@ class GNN_net(nn.Module):
         neg_logits = logits_flat[choose_neg].view(1,-1)
         
         delta = pos_logits-neg_logits
-        #delta = F.leaky_relu(pos_logits-neg_logits, negative_slope=0.01, inplace=False)
+        # delta = F.leaky_relu(pos_logits-neg_logits, negative_slope=0.01, inplace=False)
 
         delta = torch.clamp(delta, min=-80., max=80.)
         auc_loss = torch.mean(torch.log((torch.exp(-delta)+1)))
