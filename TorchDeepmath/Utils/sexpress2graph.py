@@ -7,13 +7,15 @@ class GNN_tree_node(object):
         self.parent = []
         self.parent_index = []
         self.child = []
+        self.child_position = []
         self.child_index = []
     
     def add_parent(self,node):
         self.parent.append(node)
 
-    def add_child(self,node):
+    def add_child(self,node,position):
         self.child.append(node)
+        self.child_position.append(position)
 
     def get_parent(self):
         return(self.parent)
@@ -100,12 +102,13 @@ class GNN_tree(object):
         
         if start<end:
             child = self.get_child(sexp[start:end])
-            for c in child:
+            for posi,c in enumerate(child):
                 #sharing node first
                 if c in self.subexpressions:
                     index = self.subexpressions.index(c)
                     if index not in parent.child_index:
-                        parent.child.append(self.nodes[index])
+                        parent.add_child(self.nodes[index],posi)
+                        # parent.child.append(self.nodes[index])
                         self.nodes[index].parent.append(parent)
                         parent.child_index.append(index)
                         self.nodes[index].parent_index.append(parent.index)
@@ -113,7 +116,8 @@ class GNN_tree(object):
                     child_node = self.parse_tree(c)
                     child_node.parent.append(parent)
                     child_node.parent_index.append(parent.index)
-                    parent.child.append(child_node)
+                    parent.add_child(child_node,posi)
+                    # parent.child.append(child_node)
                     parent.child_index.append(child_node.index)
         return(parent)
 

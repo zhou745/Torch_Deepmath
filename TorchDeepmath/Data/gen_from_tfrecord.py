@@ -270,6 +270,17 @@ def Conver2Graph(sexp,voc_dict):
 
     return(graph_para)
 
+def get_gather_idx_modified(graph):
+    #loop through all node to get edges
+    node_list = graph.nodes
+
+    edge_l = []
+    edge_r = []
+    for node in node_list:
+        if node.child
+        edge_l.append([node.index,])
+
+
 def get_gather_idx(graph_adj_matrix, graph_length):
 
     #compute the new length list

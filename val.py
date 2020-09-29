@@ -2,7 +2,7 @@ import TorchDeepmath as td
 import torch
 from tqdm import tqdm
 import os
-os.environ['CUDA_VISIBLE_DEVICES']="5"
+# os.environ['CUDA_VISIBLE_DEVICES']="7"
 
 
 
@@ -10,11 +10,12 @@ if __name__ == '__main__':
 
     neg_hard_per_pos = 1
     neg_per_pos = 15
-    bactch_size = 1
-    word_size = 1
-    save_name="/mnt/cache/share_data/zhoujingqiu/ckpt/exp5/model_epoch0"
-
-    dataset = td.Data.dataset.GNN_dataset("../data/data_goal2.npy","../data/data_thm2.npy",{'neg_per_pos':neg_per_pos,'neg_hard_per_pos':neg_hard_per_pos})
+    bactch_size = 32
+    word_size = 2
+    address = '682563'
+    save_name="/mnt/cache/share_data/zhoujingqiu/ckpt/exp10/model_epoch102"
+    # save_name="/mnt/cache/share_data/zhoujingqiu/ckpt/exp9/odel_epoch"
+    dataset = td.Data.dataset.GNN_dataset("../data/data_goal2.npy","../data/data_thm.npy",{'neg_per_pos':neg_per_pos,'neg_hard_per_pos':neg_hard_per_pos})
 
     model = td.Model.GNN.GNN_net({
         'goal_voc_length':1109,
@@ -31,3 +32,4 @@ if __name__ == '__main__':
     })
 
     td.Train.Train_GNN.ValLoop(dataset,model,save_name)
+    # td.Train.Train_GNN.TrainLoop(dataset,model,word_size,bactch_size,save_name,address)

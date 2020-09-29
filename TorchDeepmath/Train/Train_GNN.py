@@ -2,6 +2,7 @@ import torch
 import torch.optim as optim
 from tqdm import tqdm
 from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.optim.swa_utils import AveragedModel
 import torch.distributed as dist
 import torch.multiprocessing as mp
 import os
@@ -26,12 +27,26 @@ def model_parallel(rank, world_size,dataset,model,batch_size,save_name,address):
 
     model_new = model.to(rank)
     model_new = DDP(model_new,device_ids=[rank])
+    device = model_new.device
+
+    # state_dict = torch.load("/mnt/cache/share_data/zhoujingqiu/ckpt/exp10/model_epoch146",map_location=torch.device(device))
+    # new_state_dict = OrderedDict()
+    # for k, v in state_dict.items():
+    #     if 'module' not in k:
+    #         continue
+    #     else:
+    #         name = k[7:] # remove `module.`
+    #         new_state_dict[name] = v
+
+    # model_new.load_state_dict(new_state_dict)
 
     sampler = torch.utils.data.distributed.DistributedSampler(dataset,shuffle=True, seed=123456)
     data_loader = torch.utils.data.DataLoader(dataset,batch_size=batch_size//world_size,
                                                             collate_fn=Batch_collect,
                                                             sampler=sampler)
     print("loader build finished",flush=True) 
+    swa_model = AveragedModel(model_new,avg_fn = lambda ap, mp, nv:0.0001*mp+0.9999*ap)
+    # swa_model = DDP(swa_model,device_ids=[rank])
 
     if rank==0:
         f = open(save_name+"log","w")
@@ -43,7 +58,7 @@ def model_parallel(rank, world_size,dataset,model,batch_size,save_name,address):
     
     idx = 0 
     model_new.train(True)
-    optimizer=optim.Adam(model_new.parameters(), lr=1e-3, betas=(0.9, 0.999), eps=1e-08, weight_decay=0, amsgrad=False)
+    optimizer=optim.Adam(model_new.parameters(), lr=1e-4, betas=(0.9, 0.999), eps=1e-3, weight_decay=0, amsgrad=False)
     while True:
         print("set epoch ",flush=True)
         sampler.set_epoch(idx)
@@ -68,6 +83,8 @@ def model_parallel(rank, world_size,dataset,model,batch_size,save_name,address):
             torch.distributed.all_reduce(score_out, async_op=False)
             torch.distributed.all_reduce(auc_out, async_op=False)
 
+            swa_model.update_parameters(model_new)
+
             if rank==0:
                 # for p in model_new.parameters():
 
@@ -86,7 +103,7 @@ def model_parallel(rank, world_size,dataset,model,batch_size,save_name,address):
         for g in optimizer.param_groups:
             g['lr'] = g['lr']*0.98
         if rank==0:
-            torch.save(model_new.state_dict(), save_name+str(idx))
+            torch.save(swa_model.state_dict(), save_name+str(idx))
         idx=idx+1  
 
     cleanup()
@@ -104,8 +121,11 @@ def ValLoop(dataset,model,save_name):
     state_dict = torch.load(save_name,map_location=torch.device('cpu'))
     new_state_dict = OrderedDict()
     for k, v in state_dict.items():
-        name = k[7:] # remove `module.`
-        new_state_dict[name] = v
+        if 'module' not in k:
+            continue
+        else:
+            name = k[14:] # remove `module.`
+            new_state_dict[name] = v
 
     model.load_state_dict(new_state_dict)
 
@@ -128,7 +148,8 @@ def ValLoop(dataset,model,save_name):
 
 
         gt = item['tac_id'].item()
-        _,tac_topk = torch.topk(tactic,5)
+        tac_sco,tac_topk = torch.topk(tactic,5)
+        #print(tac_sco,flush=True)
         # print(tac_topk,flush=True)
         _,score_top1 = torch.topk(score,1)
         
