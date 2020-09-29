@@ -270,15 +270,25 @@ def Conver2Graph(sexp,voc_dict):
 
     return(graph_para)
 
-def get_gather_idx_modified(graph):
+def get_gather_idx_left_right_child(graph):
     #loop through all node to get edges
-    node_list = graph.nodes
+    graph_adj_matrix = graph.get_adjcent_maxtrix()
+    root_mask = (np.sum(graph_adj_matrix == 1,axis=1)<0.5).astype(np.float32)
+    leaf_mask = (np.sum(graph_adj_matrix == -1,axis=1)<0.5).astype(np.float32)
 
-    edge_l = []
-    edge_r = []
+    node_list = graph.nodes
+    edge_l_node0, edge_l_node1 = [], []
+    edge_r_node0, edge_r_node1 = [], []
     for node in node_list:
-        if node.child
-        edge_l.append([node.index,])
+        if len(node.child_index) >= 1:
+            edge_l_node0.append(node.index)
+            edge_l_node1.append(node.child_index[0])
+        if len(node.child_index) == 2:
+            edge_r_node0.append(node.index)
+            edge_r_node1.append(node.child_index[1])
+
+    return root_mask, leaf_mask, edge_l_node0, edge_l_node1, edge_r_node0, edge_r_node1
+
 
 
 def get_gather_idx(graph_adj_matrix, graph_length):
