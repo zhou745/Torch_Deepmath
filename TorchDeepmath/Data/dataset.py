@@ -36,59 +36,115 @@ class GNN_dataset(Dataset):
 
     def __getitem__(self,index):
         goal_token = self.goal_list[index]['goal']['token']
-        goal_self_index_p = self.goal_list[index]['goal']['self_index_p']
-        goal_parent_idx = self.goal_list[index]['goal']['parent_idx']
-        goal_root_mask = self.goal_list[index]['goal']['root_mask']
-        goal_leaf_mask = self.goal_list[index]['goal']['leaf_mask']
+        # goal_self_index_p = self.goal_list[index]['goal']['self_index_p']
+        # goal_parent_idx = self.goal_list[index]['goal']['parent_idx']
+        # goal_root_mask = self.goal_list[index]['goal']['root_mask']
+        # goal_leaf_mask = self.goal_list[index]['goal']['leaf_mask']
+
+        goal_edge_l_node0 = self.goal_list[index]['goal']['edge_l_node0']
+        goal_edge_l_node1 = self.goal_list[index]['goal']['edge_l_node1']
+        goal_edge_r_node0 = self.goal_list[index]['goal']['edge_r_node0']
+        goal_edge_r_node1 = self.goal_list[index]['goal']['edge_r_node1']
+        goal_left_mask = self.goal_list[index]['goal']['left_mask']
+        goal_right_mask = self.goal_list[index]['goal']['right_mask']
 
         tac_id = self.goal_list[index]['tac_id']
-        # print(type(self.goal_list[index]['thms']),flush=True)
         thm_pos = self._sample_one_pos(self.goal_list[index]['thms'])
         thm_neg = self._sample_neg(self.goal_list[index]['thms_hard_negatives'])
-        # print(thm_pos,flush=True)
-        # print(thm_neg,flush=True)
+
         thms = thm_pos+thm_neg
+        # thm_token_l = []
+        # thm_self_index_p_l = []
+        # thm_parent_idx_l = []
+        # thm_root_mask_l = []
+        # thm_leaf_mask_l = []
+
         thm_token_l = []
-        thm_self_index_p_l = []
-        thm_parent_idx_l = []
-        thm_root_mask_l = []
-        thm_leaf_mask_l = []
+        thm_edge_l_node0_l = []
+        thm_edge_l_node1_l = []
+        thm_edge_r_node0_l = []
+        thm_edge_r_node1_l = []
+        thm_left_mask_l = []
+        thm_right_mask_l = []
+
         
         offset = 0
         length_list_t = []
         for thm in thms:
             thm_token_l.append(thm['token'])
-            thm_self_index_p_l.append(thm['self_index_p']+offset)
-            thm_parent_idx_l.append(thm['parent_idx']+offset)
-            thm_root_mask_l.append(thm['root_mask'])
-            thm_leaf_mask_l.append(thm['leaf_mask'])
+            # thm_self_index_p_l.append(thm['self_index_p']+offset)
+            # thm_parent_idx_l.append(thm['parent_idx']+offset)
+            # thm_root_mask_l.append(thm['root_mask'])
+            # thm_leaf_mask_l.append(thm['leaf_mask'])
+
+            thm_edge_l_node0_l.append(thm['edge_l_node0']+offset)
+            thm_edge_l_node1_l.append(thm['edge_l_node1']+offset)
+            thm_edge_r_node0_l.append(thm['edge_r_node0']+offset)
+            thm_edge_r_node1_l.append(thm['edge_r_node1']+offset)
+            thm_left_mask_l.append(thm['left_mask'])
+            thm_right_mask_l.append(thm['right_mask'])            
+
             offset +=thm['token'].shape[0]
             length_list_t.append(thm['token'].shape[0])
 
         thm_token = np.concatenate(thm_token_l,axis=0)
-        thm_self_index_p = np.concatenate(thm_self_index_p_l,axis=0)
-        thm_parent_idx = np.concatenate(thm_parent_idx_l,axis=0)
-        thm_root_mask = np.concatenate(thm_root_mask_l,axis=0)
-        thm_leaf_mask = np.concatenate(thm_leaf_mask_l,axis=0)
+        # thm_self_index_p = np.concatenate(thm_self_index_p_l,axis=0)
+        # thm_parent_idx = np.concatenate(thm_parent_idx_l,axis=0)
+        # thm_root_mask = np.concatenate(thm_root_mask_l,axis=0)
+        # thm_leaf_mask = np.concatenate(thm_leaf_mask_l,axis=0)
+
+        thm_edge_l_node0 = np.concatenate(thm_edge_l_node0_l,axis=0)
+        thm_edge_l_node1 = np.concatenate(thm_edge_l_node1_l,axis=0)
+        thm_edge_r_node0 = np.concatenate(thm_edge_r_node0_l,axis=0)
+        thm_edge_r_node1 = np.concatenate(thm_edge_r_node1_l,axis=0)
+        thm_left_mask = np.concatenate(thm_left_mask_l,axis=0)
+        thm_right_mask = np.concatenate(thm_right_mask_l,axis=0)       
+
+        # del thm_token_l
+        # del thm_self_index_p_l
+        # del thm_parent_idx_l
+        # del thm_root_mask_l
+        # del thm_leaf_mask_l
 
         del thm_token_l
-        del thm_self_index_p_l
-        del thm_parent_idx_l
-        del thm_root_mask_l
-        del thm_leaf_mask_l
+        del thm_edge_l_node0_l
+        del thm_edge_l_node1_l
+        del thm_edge_r_node0_l
+        del thm_edge_r_node1_l
+        del thm_left_mask_l
+        del thm_right_mask_l
 
         # neg_items = random.sample(self.neg_thm_list,self.params['neg_per_pos'])
+        # output = {
+        #     'goal_token':goal_token,
+        #     'goal_self_index_p':goal_self_index_p,
+        #     'goal_parent_idx':goal_parent_idx,
+        #     'goal_root_mask':goal_root_mask,
+        #     'goal_leaf_mask':goal_leaf_mask,
+        #     'thm_token':thm_token,
+        #     'thm_self_index_p':thm_self_index_p,
+        #     'thm_parent_idx':thm_parent_idx,
+        #     'thm_root_mask':thm_root_mask,
+        #     'thm_leaf_mask':thm_leaf_mask,
+        #     'tac_id':tac_id,
+        #     'length_list_t':length_list_t
+        # }
+
         output = {
             'goal_token':goal_token,
-            'goal_self_index_p':goal_self_index_p,
-            'goal_parent_idx':goal_parent_idx,
-            'goal_root_mask':goal_root_mask,
-            'goal_leaf_mask':goal_leaf_mask,
+            'goal_edge_l_node0':goal_edge_l_node0,
+            'goal_edge_l_node1':goal_edge_l_node1,
+            "goal_edge_r_node0":goal_edge_r_node0,
+            "goal_edge_r_node1":goal_edge_r_node1,
+            'goal_left_mask':goal_left_mask,
+            'goal_right_mask':goal_right_mask,
             'thm_token':thm_token,
-            'thm_self_index_p':thm_self_index_p,
-            'thm_parent_idx':thm_parent_idx,
-            'thm_root_mask':thm_root_mask,
-            'thm_leaf_mask':thm_leaf_mask,
+            'thm_edge_l_node0':thm_edge_l_node0,
+            'thm_edge_l_node1':thm_edge_l_node1,
+            "thm_edge_r_node0":thm_edge_r_node0,
+            "thm_edge_r_node1":thm_edge_r_node1,
+            'thm_left_mask':thm_left_mask,
+            'thm_right_mask':thm_right_mask,
             'tac_id':tac_id,
             'length_list_t':length_list_t
         }
@@ -114,15 +170,30 @@ def Batch_collect(batch):
     output = {}
 
     goal_token_l = []
-    goal_self_index_p_l = []
-    goal_parent_idx_l = []
-    goal_root_mask_l =[]
-    goal_leaf_mask_l =[]
+    # goal_self_index_p_l = []
+    # goal_parent_idx_l = []
+    # goal_root_mask_l =[]
+    # goal_leaf_mask_l =[]
+
+    goal_edge_l_node0_l = []
+    goal_edge_l_node1_l = []
+    goal_edge_r_node0_l = []
+    goal_edge_r_node1_l = []
+    goal_left_mask_l =[]
+    goal_right_mask_l =[]
+
     thm_token_l =[]
-    thm_self_index_p_l = []
-    thm_parent_idx_l = []
-    thm_root_mask_l =[]
-    thm_leaf_mask_l = []
+    # thm_self_index_p_l = []
+    # thm_parent_idx_l = []
+    # thm_root_mask_l =[]
+    # thm_leaf_mask_l = []
+
+    thm_edge_l_node0_l = []
+    thm_edge_l_node1_l = []
+    thm_edge_r_node0_l = []
+    thm_edge_r_node1_l = []
+    thm_left_mask_l =[]
+    thm_right_mask_l = []
     tac_id_l =[]
     
     offset_g = 0
@@ -132,49 +203,92 @@ def Batch_collect(batch):
     length_list_t = []
     for b in batch:
         goal_token_l.append(b['goal_token'])
-        goal_self_index_p_l.append(b['goal_self_index_p']+offset_g)
-        goal_parent_idx_l.append(b['goal_parent_idx']+offset_g)
-        goal_root_mask_l.append(b['goal_root_mask'])
-        goal_leaf_mask_l.append(b['goal_leaf_mask'])
+        # goal_self_index_p_l.append(b['goal_self_index_p']+offset_g)
+        # goal_parent_idx_l.append(b['goal_parent_idx']+offset_g)
+        # goal_root_mask_l.append(b['goal_root_mask'])
+        # goal_leaf_mask_l.append(b['goal_leaf_mask'])
+
+        goal_edge_l_node0_l.append(b['goal_edge_l_node0']+offset_g)
+        goal_edge_l_node1_l.append(b['goal_edge_l_node1']+offset_g)
+        goal_edge_r_node0_l.append(b['goal_edge_r_node0']+offset_g)
+        goal_edge_r_node1_l.append(b['goal_edge_r_node1']+offset_g)
+        goal_left_mask_l.append(b['goal_left_mask'])
+        goal_right_mask_l.append(b['goal_right_mask'])
+
         thm_token_l.append(b['thm_token'])
-        thm_self_index_p_l.append(b['thm_self_index_p']+offset_t)
-        thm_parent_idx_l.append(b['thm_parent_idx']+offset_t)
-        thm_root_mask_l.append(b['thm_root_mask'])
-        thm_leaf_mask_l.append(b['thm_leaf_mask'])
+        # thm_self_index_p_l.append(b['thm_self_index_p']+offset_t)
+        # thm_parent_idx_l.append(b['thm_parent_idx']+offset_t)
+        # thm_root_mask_l.append(b['thm_root_mask'])
+        # thm_leaf_mask_l.append(b['thm_leaf_mask'])
+
+        thm_edge_l_node0_l.append(b['thm_edge_l_node0']+offset_t)
+        thm_edge_l_node1_l.append(b['thm_edge_l_node1']+offset_t)
+        thm_edge_r_node0_l.append(b['thm_edge_r_node0']+offset_t)
+        thm_edge_r_node1_l.append(b['thm_edge_r_node1']+offset_t)
+        thm_left_mask_l.append(b['thm_left_mask'])
+        thm_right_mask_l.append(b['thm_right_mask'])
+
         tac_id_l.append([b['tac_id']])
         offset_g+=b['goal_token'].shape[0]
         offset_t+=b['thm_token'].shape[0]
-        # print(b['goal_parent_idx'],flush=True)
-        # print(b['goal_self_index_p'],flush=True)
-        # print(b['goal_token'].shape[0])
+
         length_list_t +=b['length_list_t']
         length_list_g.append(b['goal_token'].shape[0])
 
     goal_token = np.concatenate(goal_token_l,axis=0)
-    goal_self_index_p = np.concatenate(goal_self_index_p_l,axis=0)
-    goal_parent_idx = np.concatenate(goal_parent_idx_l,axis=0)
-    goal_root_mask = np.concatenate(goal_root_mask_l,axis=0)
-    goal_leaf_mask = np.concatenate(goal_leaf_mask_l,axis=0)
+    # goal_self_index_p = np.concatenate(goal_self_index_p_l,axis=0)
+    # goal_parent_idx = np.concatenate(goal_parent_idx_l,axis=0)
+    # goal_root_mask = np.concatenate(goal_root_mask_l,axis=0)
+    # goal_leaf_mask = np.concatenate(goal_leaf_mask_l,axis=0)
+
+    goal_edge_l_node0 = np.concatenate(goal_edge_l_node0_l,axis=0)
+    goal_edge_l_node1 = np.concatenate(goal_edge_l_node1_l,axis=0)
+    goal_edge_r_node0 = np.concatenate(goal_edge_r_node0_l,axis=0)
+    goal_edge_r_node1 = np.concatenate(goal_edge_r_node1_l,axis=0)
+    goal_left_mask = np.concatenate(goal_left_mask_l,axis=0)
+    goal_right_mask = np.concatenate(goal_right_mask_l,axis=0)
 
     thm_token = np.concatenate(thm_token_l,axis=0)
-    thm_self_index_p = np.concatenate(thm_self_index_p_l,axis=0)
-    thm_parent_idx = np.concatenate(thm_parent_idx_l,axis=0)
-    thm_root_mask = np.concatenate(thm_root_mask_l,axis=0)
-    thm_leaf_mask = np.concatenate(thm_leaf_mask_l,axis=0)
+    # thm_self_index_p = np.concatenate(thm_self_index_p_l,axis=0)
+    # thm_parent_idx = np.concatenate(thm_parent_idx_l,axis=0)
+    # thm_root_mask = np.concatenate(thm_root_mask_l,axis=0)
+    # thm_leaf_mask = np.concatenate(thm_leaf_mask_l,axis=0)
+
+    thm_edge_l_node0 = np.concatenate(thm_edge_l_node0_l,axis=0)
+    thm_edge_l_node1 = np.concatenate(thm_edge_l_node1_l,axis=0)
+    thm_edge_r_node0 = np.concatenate(thm_edge_r_node0_l,axis=0)
+    thm_edge_r_node1 = np.concatenate(thm_edge_r_node1_l,axis=0)
+    thm_left_mask = np.concatenate(thm_left_mask_l,axis=0)
+    thm_right_mask = np.concatenate(thm_right_mask_l,axis=0)
     
     length_list_t = np.array(length_list_t)
     length_list_g = np.array(length_list_g)
 
     del goal_token_l
-    del goal_self_index_p_l
-    del goal_parent_idx_l
-    del goal_root_mask_l
-    del goal_leaf_mask_l
+    # del goal_self_index_p_l
+    # del goal_parent_idx_l
+    # del goal_root_mask_l
+    # del goal_leaf_mask_l
+
+    del goal_edge_l_node0_l
+    del goal_edge_l_node1_l
+    del goal_edge_r_node0_l
+    del goal_edge_r_node1_l
+    del goal_left_mask_l
+    del goal_right_mask_l
     del thm_token_l
-    del thm_self_index_p_l
-    del thm_parent_idx_l
-    del thm_root_mask_l
-    del thm_leaf_mask_l
+
+    # del thm_self_index_p_l
+    # del thm_parent_idx_l
+    # del thm_root_mask_l
+    # del thm_leaf_mask_l
+
+    del thm_edge_l_node0_l
+    del thm_edge_l_node1_l
+    del thm_edge_r_node0_l
+    del thm_edge_r_node1_l
+    del thm_left_mask_l
+    del thm_right_mask_l
 
 
     tac_id = np.concatenate(tac_id_l,axis=0)
@@ -182,17 +296,39 @@ def Batch_collect(batch):
     idx_gather_goal = get_gather_idx(length_list_g)
     idx_gather_thm = get_gather_idx(length_list_t)
     
+    # output = {
+    #     'goal_token':as_tensor(goal_token),
+    #     'goal_self_index_p':as_tensor(goal_self_index_p),
+    #     'goal_parent_idx':as_tensor(goal_parent_idx),
+    #     'goal_root_mask':as_tensor(goal_root_mask),
+    #     'goal_leaf_mask':as_tensor(goal_leaf_mask),
+    #     'thm_token':as_tensor(thm_token),
+    #     'thm_self_index_p':as_tensor(thm_self_index_p),
+    #     'thm_parent_idx':as_tensor(thm_parent_idx),
+    #     'thm_root_mask':as_tensor(thm_root_mask),
+    #     'thm_leaf_mask':as_tensor(thm_leaf_mask),
+    #     'tac_id':as_tensor(tac_id),
+    #     'idx_gather_goal':as_tensor(idx_gather_goal),
+    #     'idx_gather_thm':as_tensor(idx_gather_thm),
+    #     'length_list_g':as_tensor(length_list_g),
+    #     'length_list_t':as_tensor(length_list_t)
+    # }
+
     output = {
         'goal_token':as_tensor(goal_token),
-        'goal_self_index_p':as_tensor(goal_self_index_p),
-        'goal_parent_idx':as_tensor(goal_parent_idx),
-        'goal_root_mask':as_tensor(goal_root_mask),
-        'goal_leaf_mask':as_tensor(goal_leaf_mask),
+        'goal_edge_l_node0':as_tensor(goal_edge_l_node0),
+        'goal_edge_l_node1':as_tensor(goal_edge_l_node1),
+        'goal_edge_r_node0':as_tensor(goal_edge_r_node0),
+        'goal_edge_r_node1':as_tensor(goal_edge_r_node1),
+        'goal_left_mask':as_tensor(goal_left_mask),
+        'goal_right_mask':as_tensor(goal_right_mask),
         'thm_token':as_tensor(thm_token),
-        'thm_self_index_p':as_tensor(thm_self_index_p),
-        'thm_parent_idx':as_tensor(thm_parent_idx),
-        'thm_root_mask':as_tensor(thm_root_mask),
-        'thm_leaf_mask':as_tensor(thm_leaf_mask),
+        'thm_edge_l_node0':as_tensor(thm_edge_l_node0),
+        'thm_edge_l_node1':as_tensor(thm_edge_l_node1),
+        'thm_edge_r_node0':as_tensor(thm_edge_r_node0),
+        'thm_edge_r_node1':as_tensor(thm_edge_r_node1),
+        'thm_left_mask':as_tensor(thm_left_mask),
+        'thm_right_mask':as_tensor(thm_right_mask),
         'tac_id':as_tensor(tac_id),
         'idx_gather_goal':as_tensor(idx_gather_goal),
         'idx_gather_thm':as_tensor(idx_gather_thm),
@@ -201,15 +337,28 @@ def Batch_collect(batch):
     }
 
     del goal_token
-    del goal_self_index_p
-    del goal_parent_idx
-    del goal_root_mask
-    del goal_leaf_mask
+    # del goal_self_index_p
+    # del goal_parent_idx
+    # del goal_root_mask
+    # del goal_leaf_mask
+    del goal_edge_l_node0
+    del goal_edge_l_node1
+    del goal_edge_r_node0
+    del goal_edge_r_node1
+    del goal_left_mask
+    del goal_right_mask
+
     del thm_token
-    del thm_self_index_p
-    del thm_parent_idx
-    del thm_root_mask
-    del thm_leaf_mask
+    # del thm_self_index_p
+    # del thm_parent_idx
+    # del thm_root_mask
+    # del thm_leaf_mask
+    del thm_edge_l_node0
+    del thm_edge_l_node1
+    del thm_edge_r_node0
+    del thm_edge_r_node1
+    del thm_left_mask
+    del thm_right_mask
     del tac_id
     del idx_gather_goal
     del idx_gather_thm

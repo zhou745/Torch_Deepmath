@@ -57,10 +57,10 @@ def GetData_from_TF(files,Queue_raw,num_worker):
     idx = 0
     for item in dataset:
         idx+=1
-        if idx<37000:
-            continue
-        if idx>38000:
-            break
+        # if idx<37000:
+        #     continue
+        # if idx>38000:
+        #     break
         Queue_raw.put(item)
     
     #signal all worker that job is down
@@ -108,10 +108,10 @@ def Get_data_from_file(files,Queue_raw,num_worker):
     for item in dataset:
 
         idx+=1
-        if idx<1000:
-            continue
-        if idx>2000:
-            break
+        # if idx<1000:
+        #     continue
+        # if idx>2000:
+        #     break
         Queue_raw.put(item)
     
     #signal all worker that job is down
@@ -247,47 +247,64 @@ def Conver2Graph(sexp,voc_dict):
             token = "<OBSC>"
         graph_token_idx.append(voc_dict[token])
 
-    graph_adj_matrix = graph.get_adjcent_maxtrix()
-    graph_length = len(graph.tokens)
+    # graph_adj_matrix = graph.get_adjcent_maxtrix()
+    # graph_length = len(graph.tokens)
     
     
-    graph_self_idx_p,graph_parent_idx,graph_root_mask,graph_leaf_mask = get_gather_idx(graph_adj_matrix,graph_length)
+    # graph_self_idx_p,graph_parent_idx,graph_root_mask,graph_leaf_mask = get_gather_idx(graph_adj_matrix,graph_length)
+    idx_list = get_gather_idx_left_right_child(graph)
 
-    # graph_para = {
-    #     'token':graph_token_idx,
-    #     "self_index_p":graph_self_idx_p.tolist(),
-    #     "parent_idx":graph_parent_idx.tolist(),
-    #     "root_mask":graph_root_mask.tolist(),
-    #     "leaf_mask":graph_leaf_mask.tolist()
-    # }
     graph_para = {
-        'token':np.array(graph_token_idx),
-        "self_index_p":graph_self_idx_p,
-        "parent_idx":graph_parent_idx,
-        "root_mask":graph_root_mask,
-        "leaf_mask":graph_leaf_mask
+        'token':np.array(graph_token_idx,dtype=np.int64),
+        "edge_l_node0":idx_list[0],
+        "edge_l_node1":idx_list[1],
+        "edge_r_node0":idx_list[2],
+        "edge_r_node1":idx_list[3],
+        "left_mask": idx_list[4],
+        "right_mask": idx_list[5]
     }
+    # graph_para = {
+    #     'token':np.array(graph_token_idx),
+    #     "self_index_p":graph_self_idx_p,
+    #     "parent_idx":graph_parent_idx,
+    #     "root_mask":graph_root_mask,
+    #     "leaf_mask":graph_leaf_mask
+    # }
 
     return(graph_para)
 
 def get_gather_idx_left_right_child(graph):
     #loop through all node to get edges
-    graph_adj_matrix = graph.get_adjcent_maxtrix()
-    root_mask = (np.sum(graph_adj_matrix == 1,axis=1)<0.5).astype(np.float32)
-    leaf_mask = (np.sum(graph_adj_matrix == -1,axis=1)<0.5).astype(np.float32)
-
     node_list = graph.nodes
     edge_l_node0, edge_l_node1 = [], []
     edge_r_node0, edge_r_node1 = [], []
+
+    left_mask = np.array([1. for i in range(len(node_list))],dtype=np.float32)
+    right_mask = np.array([1. for i in range(len(node_list))],dtype=np.float32)
+
     for node in node_list:
         if len(node.child_index) >= 1:
             edge_l_node0.append(node.index)
             edge_l_node1.append(node.child_index[0])
+            edge_l_node1.append(node.index)
+            edge_l_node0.append(node.child_index[0])
+            left_mask[node.index]=0.
+            left_mask[node.child_index[0]]=0.
+
         if len(node.child_index) == 2:
             edge_r_node0.append(node.index)
             edge_r_node1.append(node.child_index[1])
+            edge_r_node1.append(node.index)
+            edge_r_node0.append(node.child_index[1])
+            right_mask[node.index]=0.
+            right_mask[node.child_index[1]]=0.
+    
+    edge_l_node0 = np.array(edge_l_node0,dtype=np.int64)
+    edge_l_node1 = np.array(edge_l_node1,dtype=np.int64)
+    edge_r_node0 = np.array(edge_r_node0,dtype=np.int64)
+    edge_r_node1 = np.array(edge_r_node1,dtype=np.int64)
 
-    return root_mask, leaf_mask, edge_l_node0, edge_l_node1, edge_r_node0, edge_r_node1
+    return edge_l_node0,edge_l_node1,edge_r_node0,edge_r_node1,left_mask,right_mask
 
 
 

@@ -69,46 +69,47 @@ class GNN(nn.Module):
         self.MLP_c = MLP(3*self.embed_size)
         self.MLP_aggr = MLP(3*self.embed_size)
     
-    def forward(self,batch_token,self_idx_batch,parent_idx_batch,
-                     root_mask,leaf_mask,start_token,end_token):
+    def forward(self,batch_token,edge_l_node0,edge_l_node1,edge_r_node0,edge_r_node1,
+                     left_mask,right_mask,start_token,end_token):
         # print(batch_token,flush=True)
 
         Num_node = batch_token.shape[0]
-        Num_edge = self_idx_batch.shape[0]
+        Num_edge_l = edge_l_node0.shape[0]
+        Num_edge_r = edge_r_node0.shape[0]
         #compute the edge initial embed
         device = batch_token.device
-        edge_in = self.MLP_E(torch.tensor([[1.]],dtype=torch.float32).to(device))
-        edge_out = self.MLP_E(torch.tensor([[0.]],dtype=torch.float32).to(device))
+        edge_l = self.MLP_E(torch.tensor([[1.]],dtype=torch.float32).to(device))
+        edge_r = self.MLP_E(torch.tensor([[0.]],dtype=torch.float32).to(device))
 
-        edge_in = edge_in.expand(Num_edge,-1)
-        edge_out = edge_out.expand(Num_edge,-1)
+        edge_l = edge_l.expand(Num_edge_l,-1)
+        edge_r = edge_r.expand(Num_edge_r,-1)
         hidden_state = self.MLP_V(batch_token)
         # print(batch_token,flush=True)
         # print(hidden_state,flush=True)
         
         #main gnn loops
         for hop in range(self.num_hops):
-            #gather self
-            node_self_batch = hidden_state[self_idx_batch,:]
-            node_parent_batch = hidden_state[parent_idx_batch,:]
-     
+            #gather node
+            edge_l_node0_batch = hidden_state[edge_l_node0,:]
+            edge_l_node1_batch = hidden_state[edge_l_node1,:]
+            edge_r_node0_batch = hidden_state[edge_r_node0,:]
+            edge_r_node1_batch = hidden_state[edge_r_node1,:]  
+
             #concat the input
-            input_parent_batch = torch.cat([node_parent_batch,node_self_batch, edge_out],-1)
-            input_child_batch = torch.cat([node_self_batch,node_parent_batch, edge_in],-1)
+            edge_l_input = torch.cat([edge_l_node1_batch,edge_l_node0_batch, edge_l],-1)
+            edge_r_input = torch.cat([edge_r_node1_batch,edge_r_node0_batch, edge_r],-1)
 
             
-            S_p = self.MLP_p(input_parent_batch)
-            S_c = self.MLP_c(input_child_batch)
+            S_l = self.MLP_p(edge_l_input)
+            S_r = self.MLP_c(edge_r_input)
 
-            S_p = torch_scatter.scatter_mean(S_p,self_idx_batch,dim=0,dim_size=Num_node)
-            S_c = torch_scatter.scatter_mean(S_c,parent_idx_batch,dim=0,dim_size=Num_node)
-            # print(parent_idx_batch,flush=True)
-            # print(self_idx_batch,flush=True)
-            # print(parent_idx_batch.shape[0],flush=True)
-            S_p=S_p + root_mask.view(-1,1)*start_token
-            S_c=S_c + leaf_mask.view(-1,1)*end_token
+            S_l = torch_scatter.scatter_mean(S_l,edge_l_node0,dim=0,dim_size=Num_node)
+            S_r = torch_scatter.scatter_mean(S_r,edge_r_node0,dim=0,dim_size=Num_node)
 
-            x_aggr = torch.cat([hidden_state,S_p,S_c],-1)
+            S_l=S_l + left_mask.view(-1,1)*start_token
+            S_r=S_r + right_mask.view(-1,1)*end_token
+
+            x_aggr = torch.cat([hidden_state,S_l,S_r],-1)
             hidden_state = hidden_state+self.MLP_aggr(x_aggr)
 
         return(hidden_state)
@@ -316,19 +317,22 @@ class GNN_net(nn.Module):
 
         thm_start_token = self.thm_embed.tokenvectors[-2,:].view(1,-1)
         thm_end_token = self.thm_embed.tokenvectors[-1,:].view(1,-1)
+
         # print(type(batch_goal_token),flush=True)
-        goal_hidden_state = self.GNN_goal(batch_goal_token,input['goal_self_index_p'],
-                                          input['goal_parent_idx'],input['goal_root_mask'],
-                                          input['goal_leaf_mask'],goal_start_token,goal_end_token)
+        # goal_hidden_state = self.GNN_goal(batch_goal_token,input['goal_self_index_p'],
+        #                                   input['goal_parent_idx'],input['goal_root_mask'],
+        #                                   input['goal_leaf_mask'],goal_start_token,goal_end_token)
+        goal_hidden_state = self.GNN_goal(batch_goal_token,input['goal_edge_l_node0'],
+                                            input['goal_edge_l_node1'],input['goal_edge_r_node0'],
+                                            input['goal_edge_r_node1'],input['goal_left_mask'],
+                                            input['goal_right_mask'],goal_start_token,goal_end_token)
 
-        thm_hidden_state = self.GNN_thm(batch_thm_token,input['thm_self_index_p'],
-                                        input['thm_parent_idx'],input['thm_root_mask'],
-                                        input['thm_leaf_mask'],thm_start_token,thm_end_token)
-
-        # thm_hidden_state = self.GNN_goal(batch_thm_token,input['thm_self_index_p'],
+        # thm_hidden_state = self.GNN_thm(batch_thm_token,input['thm_self_index_p'],
         #                                 input['thm_parent_idx'],input['thm_root_mask'],
         #                                 input['thm_leaf_mask'],thm_start_token,thm_end_token)
-
+        thm_hidden_state = self.GNN_thm(batch_thm_token,input['thm_edge_l_node0'],input['thm_edge_l_node1'],
+                                            input['thm_edge_r_node0'],input['thm_edge_r_node1'],
+                                            input['thm_left_mask'],input['thm_right_mask'],thm_start_token,thm_end_token)
 
         goal_neck_state = self.neck_goal(goal_hidden_state,input['idx_gather_goal'],input['length_list_g'].shape[0])
         thm_neck_state = self.neck_thm(thm_hidden_state,input['idx_gather_thm'],input['length_list_t'].shape[0])

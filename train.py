@@ -20,7 +20,7 @@ if __name__ == '__main__':
     neg_per_pos = 15
     bactch_size = 64
     word_size = 4
-    save_name="/mnt/cache/share_data/zhoujingqiu/ckpt/exp12/model_epoch"
+    save_name="/mnt/cache/share_data/zhoujingqiu/ckpt/exp13/model_epoch"
     address = '133948'
     # address = '245948'
 
