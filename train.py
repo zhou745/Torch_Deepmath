@@ -24,7 +24,7 @@ if __name__ == '__main__':
     address = '133948'
     # address = '245948'
 
-    dataset = td.Data.dataset.GNN_dataset("../data/data_goal.npy","../data/data_thm.npy",{'neg_per_pos':neg_per_pos,'neg_hard_per_pos':neg_hard_per_pos})
+    dataset = td.Data.dataset.GNN_dataset("../data/data_goal_lr.npy","../data/data_thmlr.npy",{'neg_per_pos':neg_per_pos,'neg_hard_per_pos':neg_hard_per_pos})
 
     model = td.Model.GNN.GNN_net({
         'goal_voc_length':1109,

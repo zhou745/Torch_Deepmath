@@ -57,10 +57,10 @@ def GetData_from_TF(files,Queue_raw,num_worker):
     idx = 0
     for item in dataset:
         idx+=1
-        # if idx<37000:
-        #     continue
-        # if idx>38000:
-        #     break
+        if idx<37000:
+           continue
+        if idx>38000:
+           break
         Queue_raw.put(item)
     
     #signal all worker that job is down

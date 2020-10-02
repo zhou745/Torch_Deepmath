@@ -27,7 +27,7 @@ def model_parallel(rank, world_size,dataset,model,batch_size,save_name,address):
 
     model_new = model.to(rank)
     model_new = DDP(model_new,device_ids=[rank])
-    device = model_new.device
+    #device = model_new.device
 
     # state_dict = torch.load("/mnt/cache/share_data/zhoujingqiu/ckpt/exp10/model_epoch146",map_location=torch.device(device))
     # new_state_dict = OrderedDict()
