@@ -106,12 +106,11 @@ class GNN_tree(object):
                 #sharing node first
                 if c in self.subexpressions:
                     index = self.subexpressions.index(c)
-                    if index not in parent.child_index:
-                        parent.add_child(self.nodes[index],posi)
-                        # parent.child.append(self.nodes[index])
-                        self.nodes[index].parent.append(parent)
-                        parent.child_index.append(index)
-                        self.nodes[index].parent_index.append(parent.index)
+                    parent.add_child(self.nodes[index],posi)
+                    # parent.child.append(self.nodes[index])
+                    self.nodes[index].parent.append(parent)
+                    parent.child_index.append(index)
+                    self.nodes[index].parent_index.append(parent.index)
                 else:
                     child_node = self.parse_tree(c)
                     child_node.parent.append(parent)

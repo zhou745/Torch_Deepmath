@@ -57,10 +57,10 @@ def GetData_from_TF(files,Queue_raw,num_worker):
     idx = 0
     for item in dataset:
         idx+=1
-        if idx<37000:
-           continue
-        if idx>38000:
-           break
+        # if idx<37000:
+        #    continue
+        # if idx>38000:
+        #    break
         Queue_raw.put(item)
     
     #signal all worker that job is down
@@ -256,12 +256,12 @@ def Conver2Graph(sexp,voc_dict):
 
     graph_para = {
         'token':np.array(graph_token_idx,dtype=np.int64),
-        "edge_l_node0":idx_list[0],
-        "edge_l_node1":idx_list[1],
-        "edge_r_node0":idx_list[2],
-        "edge_r_node1":idx_list[3],
-        "left_mask": idx_list[4],
-        "right_mask": idx_list[5]
+        "edge_p_node":idx_list[0],
+        "edge_c_node":idx_list[1],
+        "edge_p_indicate":idx_list[2],
+        "edge_c_indicate":idx_list[3],
+        "p_mask": idx_list[4],
+        "c_mask": idx_list[5]
     }
     # graph_para = {
     #     'token':np.array(graph_token_idx),
@@ -276,35 +276,41 @@ def Conver2Graph(sexp,voc_dict):
 def get_gather_idx_left_right_child(graph):
     #loop through all node to get edges
     node_list = graph.nodes
-    edge_l_node0, edge_l_node1 = [], []
-    edge_r_node0, edge_r_node1 = [], []
+    edge_p_node, edge_c_node = [], []
+    edge_p_indicate, edge_c_indicate = [], []
 
-    left_mask = np.array([1. for i in range(len(node_list))],dtype=np.float32)
-    right_mask = np.array([1. for i in range(len(node_list))],dtype=np.float32)
+    p_mask = np.array([1. for i in range(len(node_list))],dtype=np.float32)
+    c_mask = np.array([1. for i in range(len(node_list))],dtype=np.float32)
 
     for node in node_list:
+        assert len(node.child_index)<=2
+
         if len(node.child_index) >= 1:
-            edge_l_node0.append(node.index)
-            edge_l_node1.append(node.child_index[0])
-            edge_l_node1.append(node.index)
-            edge_l_node0.append(node.child_index[0])
-            left_mask[node.index]=0.
-            left_mask[node.child_index[0]]=0.
+            edge_p_node.append(node.index)
+            edge_c_node.append(node.child[0].index)
+            edge_p_indicate.append(0.)
+            edge_c_indicate.append(0.)
+
+            assert node.child_position[0]==0
+            p_mask[node.index]=0.
+            c_mask[node.child[0].index]=0.
 
         if len(node.child_index) == 2:
-            edge_r_node0.append(node.index)
-            edge_r_node1.append(node.child_index[1])
-            edge_r_node1.append(node.index)
-            edge_r_node0.append(node.child_index[1])
-            right_mask[node.index]=0.
-            right_mask[node.child_index[1]]=0.
-    
-    edge_l_node0 = np.array(edge_l_node0,dtype=np.int64)
-    edge_l_node1 = np.array(edge_l_node1,dtype=np.int64)
-    edge_r_node0 = np.array(edge_r_node0,dtype=np.int64)
-    edge_r_node1 = np.array(edge_r_node1,dtype=np.int64)
+            edge_p_node.append(node.index)
+            edge_c_node.append(node.child[1].index)
+            edge_p_indicate.append(1.)
+            edge_c_indicate.append(1.)
 
-    return edge_l_node0,edge_l_node1,edge_r_node0,edge_r_node1,left_mask,right_mask
+            assert node.child_position[1]==1
+            p_mask[node.index]=0.
+            c_mask[node.child[1].index]=0.
+    
+    edge_p_node = np.array(edge_p_node,dtype=np.int64)
+    edge_c_node = np.array(edge_c_node,dtype=np.int64)
+    edge_p_indicate = np.array(edge_p_indicate,dtype=np.float32)
+    edge_c_indicate = np.array(edge_c_indicate,dtype=np.float32)
+
+    return edge_p_node,edge_c_node,edge_p_indicate,edge_c_indicate,p_mask,c_mask
 
 
 

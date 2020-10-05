@@ -20,11 +20,11 @@ if __name__ == '__main__':
     neg_per_pos = 15
     bactch_size = 64
     word_size = 4
-    save_name="/mnt/cache/share_data/zhoujingqiu/ckpt/exp13/model_epoch"
+    save_name="/mnt/cache/share_data/zhoujingqiu/ckpt/exp_pclr/model_epoch"
     address = '133948'
     # address = '245948'
 
-    dataset = td.Data.dataset.GNN_dataset("../data/data_goal_lr.npy","../data/data_thmlr.npy",{'neg_per_pos':neg_per_pos,'neg_hard_per_pos':neg_hard_per_pos})
+    dataset = td.Data.dataset.GNN_dataset("../data/data_goal_lr.npy","../data/data_thm_lr.npy",{'neg_per_pos':neg_per_pos,'neg_hard_per_pos':neg_hard_per_pos})
 
     model = td.Model.GNN.GNN_net({
         'goal_voc_length':1109,

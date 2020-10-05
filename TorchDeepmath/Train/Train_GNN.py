@@ -46,7 +46,12 @@ def model_parallel(rank, world_size,dataset,model,batch_size,save_name,address):
                                                             sampler=sampler)
     print("loader build finished",flush=True) 
     swa_model = AveragedModel(model_new,avg_fn = lambda ap, mp, nv:0.0001*mp+0.9999*ap)
+    # swa_model = AveragedModel(model_new,avg_fn = lambda ap, mp, nv:0.05*mp+0.95*ap)
     # swa_model = DDP(swa_model,device_ids=[rank])
+    dir_pth = save_name.rstrip('/model_epoch')
+    if not os.path.exists(dir_pth):
+        os.mkdir(dir_pth)
+
 
     if rank==0:
         f = open(save_name+"log","w")
