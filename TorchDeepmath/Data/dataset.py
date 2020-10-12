@@ -98,8 +98,8 @@ class GNN_dataset(Dataset):
 
         thm_edge_p_indicate = np.concatenate(thm_edge_p_indicate_l,axis=0)
         thm_edge_c_indicate = np.concatenate(thm_edge_c_indicate_l,axis=0)
-        thm_c_mask = np.concatenate(thm_p_mask_l,axis=0)
-        thm_p_mask = np.concatenate(thm_c_mask_l,axis=0)       
+        thm_p_mask = np.concatenate(thm_p_mask_l,axis=0)
+        thm_c_mask = np.concatenate(thm_c_mask_l,axis=0)       
 
         # del thm_token_l
         # del thm_self_index_p_l

@@ -26,25 +26,24 @@ def model_parallel(rank, world_size,dataset,model,batch_size,save_name,address):
     setup(rank,address, world_size)
 
     model_new = model.to(rank)
-    model_new = DDP(model_new,device_ids=[rank])
-    #device = model_new.device
-
-    # state_dict = torch.load("/mnt/cache/share_data/zhoujingqiu/ckpt/exp10/model_epoch146",map_location=torch.device(device))
+    # state_dict = torch.load("/mnt/cache/share_data/zhoujingqiu/ckpt/exp_pclr_3/model_epoch58",map_location=torch.device('cuda:'+str(rank)))
     # new_state_dict = OrderedDict()
     # for k, v in state_dict.items():
     #     if 'module' not in k:
     #         continue
     #     else:
-    #         name = k[7:] # remove `module.`
+    #         name = k[14:] # remove `module.`
     #         new_state_dict[name] = v
-
     # model_new.load_state_dict(new_state_dict)
+    # print("ckpt loaded!",flush=True)
 
+    model_new = DDP(model_new,device_ids=[rank])
     sampler = torch.utils.data.distributed.DistributedSampler(dataset,shuffle=True, seed=123456)
     data_loader = torch.utils.data.DataLoader(dataset,batch_size=batch_size//world_size,
                                                             collate_fn=Batch_collect,
                                                             sampler=sampler)
     print("loader build finished",flush=True) 
+    # swa_model = AveragedModel(model_new,avg_fn = lambda ap, mp, nv:0.01*mp+0.99*ap)
     swa_model = AveragedModel(model_new,avg_fn = lambda ap, mp, nv:0.0001*mp+0.9999*ap)
     # swa_model = AveragedModel(model_new,avg_fn = lambda ap, mp, nv:0.05*mp+0.95*ap)
     # swa_model = DDP(swa_model,device_ids=[rank])
@@ -104,11 +103,12 @@ def model_parallel(rank, world_size,dataset,model,batch_size,save_name,address):
                         " auc "+str(auc_out.item()),flush=True)
         dist.barrier()
 
-
-        for g in optimizer.param_groups:
-            g['lr'] = g['lr']*0.98
+        if idx%10 == 9:
+            for g in optimizer.param_groups:
+                g['lr'] = g['lr']*0.98
         if rank==0:
             torch.save(swa_model.state_dict(), save_name+str(idx))
+            torch.save(model_new.state_dict(), save_name+str(idx)+"_no_mean")
         idx=idx+1  
 
     cleanup()
@@ -129,8 +129,9 @@ def ValLoop(dataset,model,save_name):
         if 'module' not in k:
             continue
         else:
-            name = k[14:] # remove `module.`
-            new_state_dict[name] = v
+            while 'module' in k:
+                k = k[7:]
+            new_state_dict[k] = v
 
     model.load_state_dict(new_state_dict)
 
@@ -153,7 +154,7 @@ def ValLoop(dataset,model,save_name):
 
 
         gt = item['tac_id'].item()
-        tac_sco,tac_topk = torch.topk(tactic,5)
+        tac_sco,tac_topk = torch.topk(tactic,1)
         #print(tac_sco,flush=True)
         # print(tac_topk,flush=True)
         _,score_top1 = torch.topk(score,1)
