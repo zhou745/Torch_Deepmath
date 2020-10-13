@@ -46,11 +46,10 @@ def model_parallel(rank, world_size,dataset,model,batch_size,save_name,address):
     # swa_model = AveragedModel(model_new,avg_fn = lambda ap, mp, nv:0.01*mp+0.99*ap)
     swa_model = AveragedModel(model_new,avg_fn = lambda ap, mp, nv:0.0001*mp+0.9999*ap)
     # swa_model = AveragedModel(model_new,avg_fn = lambda ap, mp, nv:0.05*mp+0.95*ap)
-    # swa_model = DDP(swa_model,device_ids=[rank])
-    dir_pth = save_name.rstrip('/model_epoch')
-    if not os.path.exists(dir_pth):
-        os.mkdir(dir_pth)
 
+    # dir_pth = save_name.rstrip('/model_epoch')
+    # if not os.path.exists(dir_pth):
+    #     os.mkdir(dir_pth)
 
     if rank==0:
         f = open(save_name+"log","w")
@@ -103,7 +102,7 @@ def model_parallel(rank, world_size,dataset,model,batch_size,save_name,address):
                         " auc "+str(auc_out.item()),flush=True)
         dist.barrier()
 
-        if idx%10 == 9:
+        if idx%35 == 34:
             for g in optimizer.param_groups:
                 g['lr'] = g['lr']*0.98
         if rank==0:

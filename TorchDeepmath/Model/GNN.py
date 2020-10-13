@@ -101,10 +101,16 @@ class GNN(nn.Module):
 
             S_p = torch_scatter.scatter_mean(S_p,edge_p_node,dim=0,dim_size=Num_node)
             S_c = torch_scatter.scatter_mean(S_c,edge_c_node,dim=0,dim_size=Num_node)
+            #print(torch.sum(torch.abs(S_p),axis=-1),flush=True)
+            #print(torch.sum(torch.abs(S_c),axis=-1),flush=True)
 
             S_p=S_p + p_mask.view(-1,1)*start_token
             S_c=S_c + c_mask.view(-1,1)*end_token
-
+            #print(torch.sum(torch.abs(S_c),axis=-1),flush=True)
+            # print(edge_p_node,flush=True)
+            # print(edge_c_node,flush=True)
+            # print(p_mask,flush=True)
+            # print(c_mask,flush=True)
             x_aggr = torch.cat([hidden_state,S_p,S_c],-1)
             hidden_state = hidden_state+self.MLP_aggr(x_aggr)
 
@@ -122,7 +128,8 @@ class Neck(nn.Module):
             nn.Linear(self.embed_size,self.filters[0]),
             nn.ReLU(),
             nn.Linear(self.filters[0],self.filters[1]),
-            nn.ReLU()
+            nn.ReLU(),
+            nn.Dropout(p=0.5)
         )
 
         for p in self.model.parameters():
