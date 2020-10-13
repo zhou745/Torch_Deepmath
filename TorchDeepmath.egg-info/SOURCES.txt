@@ -1,0 +1,16 @@
+setup.py
+TorchDeepmath/__init__.py
+TorchDeepmath.egg-info/PKG-INFO
+TorchDeepmath.egg-info/SOURCES.txt
+TorchDeepmath.egg-info/dependency_links.txt
+TorchDeepmath.egg-info/top_level.txt
+TorchDeepmath/Data/__init__.py
+TorchDeepmath/Data/dataset.py
+TorchDeepmath/Data/gen_from_tfrecord.py
+TorchDeepmath/Model/GNN.py
+TorchDeepmath/Model/GNN_zhou.py
+TorchDeepmath/Model/__init__.py
+TorchDeepmath/Train/Train_GNN.py
+TorchDeepmath/Train/__init__.py
+TorchDeepmath/Utils/__init__.py
+TorchDeepmath/Utils/sexpress2graph.py

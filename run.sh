@@ -1,0 +1,1 @@
+srun --partition=vc_research_2 --gres=gpu:8 -N2  --job-name=GNN_large --kill-on-bad-exit=1 python train.py
