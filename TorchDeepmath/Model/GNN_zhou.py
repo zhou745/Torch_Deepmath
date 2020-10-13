@@ -42,12 +42,11 @@ class MLP(nn.Module):
         super(MLP,self).__init__()
 
         self.model = nn.Sequential(
-            nn.Dropout(p=0.5),
             nn.Linear(input_size,layer_size[0]),
             nn.ReLU(),
-            nn.Dropout(p=0.5),
             nn.Linear(layer_size[0],layer_size[1]),
-            nn.ReLU()
+            nn.ReLU(),
+            nn.Dropout(p=0.5)
         )
         
         for p in self.model.parameters():
@@ -120,12 +119,11 @@ class Neck(nn.Module):
         
        
         self.model = nn.Sequential(
-            nn.Dropout(p=0.5),
             nn.Linear(self.embed_size,self.filters[0]),
             nn.ReLU(),
-            nn.Dropout(p=0.5),
             nn.Linear(self.filters[0],self.filters[1]),
-            nn.ReLU()
+            nn.ReLU(),
+            nn.Dropout(p=0.5)
         )
 
         for p in self.model.parameters():
