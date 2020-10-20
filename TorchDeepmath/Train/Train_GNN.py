@@ -27,24 +27,29 @@ def setup(rank, dist_url,world_size,name='nccl'):
 def cleanup():
     dist.destroy_process_group()
 
-def model_parallel(rank, world_size,dataset,model,batch_size,save_name,dist_url):
+def model_parallel(rank, world_size,dataset,model,batch_size,save_name,dist_url,pid,load_name=None,decay_rate=35):
     # device = 'cuda'
+    gpu = rank
+    rank = pid*8+gpu
     print("current rank is %d"%(rank),flush=True)
     setup(rank,dist_url, world_size)
 
-    model_new = model.to(rank)
-    # state_dict = torch.load("/mnt/cache/share_data/zhoujingqiu/ckpt/exp_pclr_3/model_epoch58",map_location=torch.device('cuda:'+str(rank)))
-    # new_state_dict = OrderedDict()
-    # for k, v in state_dict.items():
-    #     if 'module' not in k:
-    #         continue
-    #     else:
-    #         name = k[14:] # remove `module.`
-    #         new_state_dict[name] = v
-    # model_new.load_state_dict(new_state_dict)
-    # print("ckpt loaded!",flush=True)
+    model_new = model.to(gpu)
+    if load_name is not None:
+        state_dict = torch.load(load_name,map_location=torch.device('cuda:'+str(gpu)))
+        new_state_dict = OrderedDict()
 
-    model_new = DDP(model_new,device_ids=[rank])
+        for k, v in state_dict.items():
+            if 'module' not in k:
+                continue
+            else:
+                while 'module' in k:
+                    k = k[7:]
+                new_state_dict[k] = v
+        model_new.load_state_dict(new_state_dict)
+        print("ckpt loaded!",flush=True)
+
+    model_new = DDP(model_new,device_ids=[gpu])
     sampler = torch.utils.data.distributed.DistributedSampler(dataset,shuffle=True, seed=123456)
     data_loader = torch.utils.data.DataLoader(dataset,batch_size=batch_size//world_size,
                                                             collate_fn=Batch_collect,
@@ -110,18 +115,18 @@ def model_parallel(rank, world_size,dataset,model,batch_size,save_name,dist_url)
                         " auc "+str(auc_out.item()),flush=True)
         dist.barrier()
 
-        if idx%35 == 34:
+        if idx%decay_rate == (decay_rate-1):
             for g in optimizer.param_groups:
                 g['lr'] = g['lr']*0.98
-        if rank==0:
+        if rank==0 and idx%10==0:
             torch.save(swa_model.state_dict(), save_name+str(idx))
-            torch.save(model_new.state_dict(), save_name+str(idx)+"_no_mean")
+            # torch.save(model_new.state_dict(), save_name+str(idx)+"_no_mean")
         idx=idx+1  
 
     cleanup()
 
 
-def TrainLoop(dataset,model,world_size,batch_size,save_name):
+def TrainLoop(dataset,model,world_size,batch_size,save_name,num_node,load_name=None,decay_rate=35):
     #write the host file
     pid = int(os.environ["SLURM_PROCID"])
     jobid = os.environ["SLURM_JOBID"]
@@ -134,7 +139,7 @@ def TrainLoop(dataset,model,world_size,batch_size,save_name):
     if pid == 0:
         dist_url = "tcp://{}:{}".format(ip, port)
         with open(hostfile, "w") as f:
-            f.write(args.dist_url)
+            f.write(dist_url)
     else:
         while not os.path.exists(hostfile):
                 time.sleep(1)
@@ -143,7 +148,7 @@ def TrainLoop(dataset,model,world_size,batch_size,save_name):
     
 
     if world_size>0:
-        train_multi_gpu(dataset,model,world_size,batch_size,save_name,dist_url)
+        train_multi_gpu(dataset,model,world_size,batch_size,save_name,dist_url,pid,num_node,load_name,decay_rate)
 
 def ValLoop(dataset,model,save_name):
     data_loader = torch.utils.data.DataLoader(dataset,batch_size=1,
@@ -165,11 +170,15 @@ def ValLoop(dataset,model,save_name):
     device = torch.device('cuda:0')
     model.to(device)
     model.train(False)
+    print(torch.sum(torch.abs(model.goal_embed.tokenvectors[8,:])),flush=True)
+    print(torch.sum(torch.abs(model.thm_embed.tokenvectors[8,:])),flush=True)
+    # model.eval()
 
     N_all = 0
     N_true_tac = 0
     N_true_sco = 0
     N_true_sample = 0
+
     for item in tqdm(data_loader):
         for k in item.keys():
             item[k]=item[k].to(device)
@@ -201,9 +210,9 @@ def ValLoop(dataset,model,save_name):
 
 
 
-def train_multi_gpu(dataset,model,world_size,batch_size,save_name,dist_url):
+def train_multi_gpu(dataset,model,world_size,batch_size,save_name,dist_url,pid,num_node,load_name=None,decay_rate=35):
 
-    mp.spawn(model_parallel,args=(world_size,dataset,model,batch_size,save_name,dist_url),
-                            nprocs=world_size,
+    mp.spawn(model_parallel,args=(world_size,dataset,model,batch_size,save_name,dist_url,pid,load_name,decay_rate),
+                            nprocs=world_size//num_node,
                             join=True)
     

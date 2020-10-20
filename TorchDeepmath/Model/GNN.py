@@ -6,8 +6,11 @@ import torch_scatter
 import numpy as np
 import torch.distributed as dist
 
-init_a = -0.1
-init_b = 0.1
+init_a = -0.01
+init_b = 0.01
+
+p1 = 0.5
+p2 = 0.3
 
 class Toynet(nn.Module):
     def __init__(self):
@@ -42,12 +45,11 @@ class MLP(nn.Module):
         super(MLP,self).__init__()
 
         self.model = nn.Sequential(
-            nn.Dropout(p=0.5),
             nn.Linear(input_size,layer_size[0]),
             nn.ReLU(),
-            nn.Dropout(p=0.5),
             nn.Linear(layer_size[0],layer_size[1]),
-            nn.ReLU()
+            nn.ReLU(),
+            nn.Dropout(p=p1)
         )
         
         for p in self.model.parameters():
@@ -102,18 +104,19 @@ class GNN(nn.Module):
 
             S_p = torch_scatter.scatter_mean(S_p,edge_p_node,dim=0,dim_size=Num_node)
             S_c = torch_scatter.scatter_mean(S_c,edge_c_node,dim=0,dim_size=Num_node)
-            #print(torch.sum(torch.abs(S_p),axis=-1),flush=True)
-            #print(torch.sum(torch.abs(S_c),axis=-1),flush=True)
+            # print(torch.sum(torch.abs(S_p),axis=-1),flush=True)
+            # print(torch.sum(torch.abs(S_c),axis=-1),flush=True)
 
             S_p=S_p + p_mask.view(-1,1)*start_token
             S_c=S_c + c_mask.view(-1,1)*end_token
-            #print(torch.sum(torch.abs(S_c),axis=-1),flush=True)
+            # print(torch.sum(torch.abs(S_c),axis=-1),flush=True)
             # print(edge_p_node,flush=True)
             # print(edge_c_node,flush=True)
             # print(p_mask,flush=True)
             # print(c_mask,flush=True)
             x_aggr = torch.cat([hidden_state,S_p,S_c],-1)
             hidden_state = hidden_state+self.MLP_aggr(x_aggr)
+            hidden_state = F.relu(hidden_state)
 
         return(hidden_state)
 
@@ -126,10 +129,8 @@ class Neck(nn.Module):
         
        
         self.model = nn.Sequential(
-            nn.Dropout(p=0.5),
             nn.Linear(self.embed_size,self.filters[0]),
             nn.ReLU(),
-            nn.Dropout(p=0.5),
             nn.Linear(self.filters[0],self.filters[1]),
             nn.ReLU()
         )
@@ -157,13 +158,13 @@ class Tactic_Classifier(nn.Module):
         self.hidden_layers = hidden_layers
 
         self.model = nn.Sequential(
-            nn.Dropout(p=0.3),
+            nn.Dropout(p=p2),
             nn.Linear(self.input_size,self.hidden_layers[0]),
             nn.ReLU(),
-            nn.Dropout(p=0.3),
+            nn.Dropout(p=p2),
             nn.Linear(self.hidden_layers[0],self.hidden_layers[1]),
             nn.ReLU(),
-            nn.Dropout(p=0.3),
+            nn.Dropout(p=p2),
             nn.Linear(self.hidden_layers[1],self.hidden_layers[2])
         )
 
@@ -181,13 +182,13 @@ class Theom_logit(nn.Module):
         self.hidden_layers = hidden_layers
       
         self.model = nn.Sequential(
-            nn.Dropout(p=0.3),
+            nn.Dropout(p=p2),
             nn.Linear(self.embed_size*3,self.hidden_layers[0]),
             nn.ReLU(),
-            nn.Dropout(p=0.3),
+            nn.Dropout(p=p2),
             nn.Linear(self.hidden_layers[0],self.hidden_layers[1]),
             nn.ReLU(),
-            nn.Dropout(p=0.3),
+            nn.Dropout(p=p2),
             nn.Linear(self.hidden_layers[1],self.hidden_layers[2])
         )
 
@@ -254,29 +255,41 @@ class GNN_net(nn.Module):
         assert num_thm%num_goal==0
         logits_flat = logits.view(-1)
         tmp = np.zeros([logits_flat.shape[0]],dtype=np.float32)
+        tmp_goal = np.zeros([logits_flat.shape[0]],dtype=np.float32)
         for idx in range(num_goal):
             tmp[idx*num_thm+idx*offset_num]=1.
-        
+            tmp_goal[idx*num_thm:idx*num_thm+idx*offset_num]=1.
+            tmp_goal[idx*num_thm+idx*offset_num+1:idx*num_thm+num_thm]=1.
+
         device = logits.device
 
         choose_pos = torch.tensor(tmp>0.5).to(device)
         choose_neg = torch.tensor(tmp<0.5).to(device)
+        choose_neg_goal = torch.tensor(tmp_goal>0.5).to(device)
+
 
         pos_logits = logits_flat[choose_pos].view(-1,1)
         neg_logits = logits_flat[choose_neg].view(1,-1)
+
+        pos_logits_goal = pos_logits.expand(-1,num_thm-1)
+        neg_logits_goal = logits_flat[choose_neg_goal].view(-1,num_thm-1)
         
         delta = pos_logits-neg_logits
+        delta_goal = pos_logits_goal-neg_logits_goal
         # delta = F.leaky_relu(pos_logits-neg_logits, negative_slope=0.01, inplace=False)
 
         delta = torch.clamp(delta, min=-80., max=80.)
-        auc_loss = torch.mean(torch.log((torch.exp(-delta)+1)))
-        # auc_loss = torch.mean(-torch.log(torch.sigmoid(delta)*(1-1e-4)+1e-20))
+        delta_goal = torch.clamp(delta_goal, min=-80., max=80.)
 
+        auc_loss = torch.log((torch.exp(-delta)+1)).view(-1)
+        auc_loss_goal = torch.log((torch.exp(-delta_goal)+1)).view(-1)
+        
+        auc_loss_all = torch.mean(torch.cat((auc_loss,auc_loss_goal),-1))
         #raise positive logits by force
         # auc_loss+= torch.mean(1-torch.sigmoid(pos_logits))
         # auc_loss+= torch.mean(torch.sigmoid(neg_logits))*0.2
 
-        return(auc_loss)
+        return(auc_loss_all)
 
     def loss(self,tactic_scores,logits,gt_tactic):
         batch_current = gt_tactic.shape[0]

@@ -23,7 +23,7 @@ class GNN_dataset(Dataset):
         return(random.sample(thms_list,1))
     
     def _sample_neg(self,hard_neg_thm_list):
-        
+
         if len(hard_neg_thm_list)==0:
             return(random.sample(self.neg_thm_list,self.params['neg_per_pos']))
         elif len(hard_neg_thm_list)<self.params['neg_hard_per_pos']:
