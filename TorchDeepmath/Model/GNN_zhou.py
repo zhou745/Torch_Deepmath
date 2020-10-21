@@ -6,8 +6,8 @@ import torch_scatter
 import numpy as np
 import torch.distributed as dist
 
-init_a = -0.1
-init_b = 0.1
+init_a = -0.01
+init_b = 0.01
 p1 = 0.5
 p2 = 0.3
 

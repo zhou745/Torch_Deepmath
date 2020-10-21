@@ -12,17 +12,21 @@ if __name__ == '__main__':
     neg_per_pos = 15
     bactch_size = 128
     word_size = 8
-    save_name="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_load318/model_epoch"
-   #  load_name = None
-   #  load_name = "/mnt/cache/share_data/zhoujq/ckpt/exp_pclr3/model_epoch137"
+    save_name="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_large_human_synth/model_epoch"
+    load_name = None
+    #  load_name = "/mnt/cache/share_data/zhoujq/ckpt/exp_pclr3/model_epoch137"
     # load_name = "/mnt/cache/share_data/zhoujq/ckpt/exp_pclr0/savelast"
-    load_name = "/mnt/cache/share_data/zhoujq/ckpt/exp_init/model_epoch318"
+    #  load_name = "/mnt/cache/share_data/zhoujq/ckpt/exp_init/model_epoch318"
     decay_rate = 10
     num_node = 1
 
-    model_type =0
+    model_type =1
 
-    dataset = td.Data.dataset.GNN_dataset("../data/data_goal_lr.npy","../data/data_thm_lr.npy",{'neg_per_pos':neg_per_pos,'neg_hard_per_pos':neg_hard_per_pos})
+    path_goal = "/mnt/cache/zhoujingqiu/data/data_human_synth_1_3_lr.npy"
+    #  path_goal = "/mnt/cache/zhoujingqiu/data/data_goal_lr.npy"
+    path_thm = "/mnt/cache/zhoujingqiu/data/data_thm_lr.npy"
+
+    dataset = td.Data.dataset.GNN_dataset(path_goal,path_thm,{'neg_per_pos':neg_per_pos,'neg_hard_per_pos':neg_hard_per_pos})
     
     if model_type == 0:
        model = td.Model.GNN.GNN_net({
@@ -33,7 +37,7 @@ if __name__ == '__main__':
             'num_hops':12,
             'score_weight':0.2,
             'tactic_weight':1.0,
-            'auc_weight':4.0,
+            'auc_weight':40.0,
             'neg_per_pos':neg_per_pos,
             'bactch_size':bactch_size,
             'word_size':word_size

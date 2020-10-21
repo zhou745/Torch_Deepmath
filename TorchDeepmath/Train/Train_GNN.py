@@ -56,10 +56,10 @@ def model_parallel(rank, world_size,dataset,model,batch_size,save_name,dist_url,
                                                             sampler=sampler)
     print("loader build finished",flush=True) 
     # swa_model = AveragedModel(model_new,avg_fn = lambda ap, mp, nv:0.01*mp+0.99*ap)
-    swa_model = AveragedModel(model_new,avg_fn = lambda ap, mp, nv:0.0001*mp+0.9999*ap)
+    swa_model = AveragedModel(model_new,avg_fn = lambda ap, mp, nv:0.0002*mp+0.9998*ap)
     # swa_model = AveragedModel(model_new,avg_fn = lambda ap, mp, nv:0.05*mp+0.95*ap)
     # swa_model = DDP(swa_model,device_ids=[rank])
-    dir_pth = save_name.rstrip('/model_epoch')
+    dir_pth,file_name = os.path.split(save_name)
     if not os.path.exists(dir_pth):
         os.mkdir(dir_pth)
 
@@ -117,8 +117,8 @@ def model_parallel(rank, world_size,dataset,model,batch_size,save_name,dist_url,
 
         if idx%decay_rate == (decay_rate-1):
             for g in optimizer.param_groups:
-                g['lr'] = g['lr']*0.98
-        if rank==0 and idx%10==0:
+                g['lr'] = g['lr']*0.96
+        if rank==0 and idx%2==0:
             torch.save(swa_model.state_dict(), save_name+str(idx))
             # torch.save(model_new.state_dict(), save_name+str(idx)+"_no_mean")
         idx=idx+1  
