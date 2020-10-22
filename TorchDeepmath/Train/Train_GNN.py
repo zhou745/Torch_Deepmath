@@ -27,15 +27,15 @@ def setup(rank, dist_url,world_size,name='nccl'):
 def cleanup():
     dist.destroy_process_group()
 
-def model_parallel(rank, world_size,dataset,model,batch_size,save_name,dist_url,pid,load_name=None,decay_rate=35):
+def model_parallel(rank,pid,dist_url,dataset,model,args):
     # device = 'cuda'
     gpu = rank
     rank = pid*8+gpu
     print("current rank is %d"%(rank),flush=True)
-    setup(rank,dist_url, world_size)
+    setup(rank,dist_url, args.world_size)
 
     model_new = model.to(gpu)
-    if load_name is not None:
+    if args.load_name is not None:
         state_dict = torch.load(load_name,map_location=torch.device('cuda:'+str(gpu)))
         new_state_dict = OrderedDict()
 
@@ -51,21 +51,22 @@ def model_parallel(rank, world_size,dataset,model,batch_size,save_name,dist_url,
 
     model_new = DDP(model_new,device_ids=[gpu])
     sampler = torch.utils.data.distributed.DistributedSampler(dataset,shuffle=True, seed=123456)
-    data_loader = torch.utils.data.DataLoader(dataset,batch_size=batch_size//world_size,
+    data_loader = torch.utils.data.DataLoader(dataset,batch_size=args.batch_size//args.world_size,
                                                             collate_fn=Batch_collect,
-                                                            sampler=sampler)
+                                                            sampler=sampler,
+                                                            num_workers=4)
     print("loader build finished",flush=True) 
     # swa_model = AveragedModel(model_new,avg_fn = lambda ap, mp, nv:0.01*mp+0.99*ap)
     swa_model = AveragedModel(model_new,avg_fn = lambda ap, mp, nv:0.0002*mp+0.9998*ap)
     # swa_model = AveragedModel(model_new,avg_fn = lambda ap, mp, nv:0.05*mp+0.95*ap)
-    # swa_model = DDP(swa_model,device_ids=[rank])
-    dir_pth,file_name = os.path.split(save_name)
-    if not os.path.exists(dir_pth):
-        os.mkdir(dir_pth)
-
 
     if rank==0:
-        f = open(save_name+"log","w")
+        dir_pth,file_name = os.path.split(args.save_name)
+        if not os.path.exists(dir_pth):
+            os.mkdir(dir_pth)
+            print("create directory "+dir_pth,flush=True)
+
+        f = open(args.save_name+"log","w")
         f.close()
     # model_new.to(device)
     #borad cast the initial weight as the same
@@ -74,7 +75,7 @@ def model_parallel(rank, world_size,dataset,model,batch_size,save_name,dist_url,
     
     idx = 0 
     model_new.train(True)
-    optimizer=optim.Adam(model_new.parameters(), lr=1e-4, betas=(0.9, 0.999), eps=1e-3, weight_decay=0, amsgrad=False)
+    optimizer=optim.Adam(model_new.parameters(), lr=args.lr, betas=(0.9, 0.999), eps=1e-3, weight_decay=0, amsgrad=False)
     while True:
         print("set epoch ",flush=True)
         sampler.set_epoch(idx)
@@ -102,11 +103,8 @@ def model_parallel(rank, world_size,dataset,model,batch_size,save_name,dist_url,
             swa_model.update_parameters(model_new)
 
             if rank==0:
-                # for p in model_new.parameters():
-
-                #     print(p.grad,flush=True)
                 log_str = str(score_out.item())+" "+str(tactic_out.item())+" "+str(auc_out.item())+"\n"
-                f = open(save_name+"log","a")
+                f = open(args.save_name+"log","a")
                 f.write(log_str)
                 f.close()
                 print("At epoch "+str(idx)+" the current loss is "+str(loss_out.item())+
@@ -115,18 +113,18 @@ def model_parallel(rank, world_size,dataset,model,batch_size,save_name,dist_url,
                         " auc "+str(auc_out.item()),flush=True)
         dist.barrier()
 
-        if idx%decay_rate == (decay_rate-1):
+        if idx%args.decay_rate == (args.decay_rate-1):
             for g in optimizer.param_groups:
-                g['lr'] = g['lr']*0.96
-        if rank==0 and idx%2==0:
-            torch.save(swa_model.state_dict(), save_name+str(idx))
-            # torch.save(model_new.state_dict(), save_name+str(idx)+"_no_mean")
+                g['lr'] = g['lr']*args.lr_decay
+        if rank==0 and idx%args.save_frequency==0:
+            torch.save(swa_model.state_dict(), args.save_name+str(idx))
+            torch.save(model_new.state_dict(), args.save_name+str(idx)+"master_copy")
         idx=idx+1  
 
     cleanup()
 
 
-def TrainLoop(dataset,model,world_size,batch_size,save_name,num_node,load_name=None,decay_rate=35):
+def TrainLoop(dataset,model,args):
     #write the host file
     pid = int(os.environ["SLURM_PROCID"])
     jobid = os.environ["SLURM_JOBID"]
@@ -146,16 +144,14 @@ def TrainLoop(dataset,model,world_size,batch_size,save_name,num_node,load_name=N
         with open(hostfile, "r") as f:
             dist_url = f.read()
     
+    train_multi_gpu(dataset,model,pid,dist_url,args)
 
-    if world_size>0:
-        train_multi_gpu(dataset,model,world_size,batch_size,save_name,dist_url,pid,num_node,load_name,decay_rate)
-
-def ValLoop(dataset,model,save_name):
+def ValLoop(dataset,model,args):
     data_loader = torch.utils.data.DataLoader(dataset,batch_size=1,
                                                         collate_fn=Batch_collect,
                                                         num_workers=4)
 
-    state_dict = torch.load(save_name,map_location=torch.device('cpu'))
+    state_dict = torch.load(args.load_name,map_location=torch.device('cpu'))
     new_state_dict = OrderedDict()
     for k, v in state_dict.items():
         if 'module' not in k:
@@ -210,9 +206,9 @@ def ValLoop(dataset,model,save_name):
 
 
 
-def train_multi_gpu(dataset,model,world_size,batch_size,save_name,dist_url,pid,num_node,load_name=None,decay_rate=35):
+def train_multi_gpu(dataset,model,pid,dist_url,args):
 
-    mp.spawn(model_parallel,args=(world_size,dataset,model,batch_size,save_name,dist_url,pid,load_name,decay_rate),
-                            nprocs=world_size//num_node,
+    mp.spawn(model_parallel,args=(pid,dist_url,dataset,model,args),
+                            nprocs=args.world_size//args.num_node,
                             join=True)
     

@@ -32,6 +32,7 @@ class Tokenstore(nn.Module):
         self.voc_embedsize = voc_embedsize
         self.register_parameter(name='tokenvectors', param=torch.nn.Parameter(torch.zeros([self.voc_length+2,self.voc_embedsize],
                                                                                            dtype=torch.float32)))
+        # self.tokenvectors=torch.nn.Embedding()
 
         if initializer==None:
             init.uniform_(self.tokenvectors, a=init_a, b=init_b)
@@ -60,35 +61,36 @@ class MLP(nn.Module):
         return(self.model(input))
 
 class GNN(nn.Module):
-    def __init__(self,num_hops,embed_size):
+    def __init__(self,num_hops,embed_size,layer_size=[256,128]):
         super(GNN,self).__init__()
 
         self.num_hops = num_hops
         self.embed_size = embed_size
-
-        self.MLP_V = MLP(self.embed_size)
-        self.MLP_E = MLP(1)
-        self.MLP_p = MLP(3*self.embed_size)
-        self.MLP_c = MLP(3*self.embed_size)
-        self.MLP_aggr = MLP(3*self.embed_size)
+        if self.num_hops>0:
+            self.MLP_V = MLP(self.embed_size,layer_size)
+        if self.num_hops>1:
+            self.MLP_E = MLP(1)
+            self.MLP_p = MLP(3*self.embed_size,layer_size)
+            self.MLP_c = MLP(3*self.embed_size,layer_size)
+            self.MLP_aggr = MLP(3*self.embed_size,layer_size)
     
     def forward(self,batch_token,edge_p_node,edge_c_node,edge_p_indicate,edge_c_indicate,
                      p_mask,c_mask,start_token,end_token):
         # print(batch_token,flush=True)
 
         Num_node = batch_token.shape[0]
-        # Num_edge = edge_p_node.shape[0]
+        if self.num_hops>0:
+            hidden_state = self.MLP_V(batch_token)
+        else:
+            hidden_state = batch_token
        
         #compute the edge initial embed
-        edge_p = self.MLP_E(edge_p_indicate.view(-1,1))
-        edge_c = self.MLP_E(edge_c_indicate.view(-1,1))
-
-        # edge_l = edge_l.expand(Num_edge_l,-1)
-        # edge_r = edge_r.expand(Num_edge_r,-1)
-        hidden_state = self.MLP_V(batch_token)
+        if self.num_hops>1:
+            edge_p = self.MLP_E(edge_p_indicate.view(-1,1))
+            edge_c = self.MLP_E(edge_c_indicate.view(-1,1))
 
         #main gnn loops
-        for hop in range(self.num_hops):
+        for hop in range(self.num_hops-1):
             #gather node
             edge_p_node_batch = hidden_state[edge_p_node,:]
             edge_c_node_batch = hidden_state[edge_c_node,:]
@@ -100,20 +102,13 @@ class GNN(nn.Module):
             
             S_p = self.MLP_p(edge_p_input)
             S_c = self.MLP_c(edge_c_input)
-            # print("-----------------------------------------",flush=True)
 
             S_p = torch_scatter.scatter_mean(S_p,edge_p_node,dim=0,dim_size=Num_node)
             S_c = torch_scatter.scatter_mean(S_c,edge_c_node,dim=0,dim_size=Num_node)
-            # print(torch.sum(torch.abs(S_p),axis=-1),flush=True)
-            # print(torch.sum(torch.abs(S_c),axis=-1),flush=True)
 
             S_p=S_p + p_mask.view(-1,1)*start_token
             S_c=S_c + c_mask.view(-1,1)*end_token
-            # print(torch.sum(torch.abs(S_c),axis=-1),flush=True)
-            # print(edge_p_node,flush=True)
-            # print(edge_c_node,flush=True)
-            # print(p_mask,flush=True)
-            # print(c_mask,flush=True)
+    
             x_aggr = torch.cat([hidden_state,S_p,S_c],-1)
             hidden_state = hidden_state+self.MLP_aggr(x_aggr)
             hidden_state = F.relu(hidden_state)
@@ -210,37 +205,30 @@ class Theom_logit(nn.Module):
         return(socre_logits)            
         
 class GNN_net(nn.Module):
-    def __init__(self,params):
+    def __init__(self,args):
         super(GNN_net,self).__init__()
 
-        self.goal_embed=Tokenstore(params['goal_voc_length'],params['goal_voc_embedsize'])
-        self.thm_embed=Tokenstore(params['thm_voc_length'],params['thm_voc_embedsize'])
+        self.goal_embed=Tokenstore(args.goal_voc_length,args.goal_voc_embedsize)
+        self.thm_embed=Tokenstore(args.thm_voc_length,args.thm_voc_embedsize)
 
-        self.GNN_goal = GNN(params['num_hops'],params['goal_voc_embedsize'])
-        self.GNN_thm = GNN(params['num_hops'],params['thm_voc_embedsize'])
+        self.num_hops = args.num_hops
 
-        self.neck_goal = Neck(params['goal_voc_embedsize'])
-        self.neck_thm = Neck(params['thm_voc_embedsize'])
+        self.GNN_goal = GNN(args.num_hops,args.goal_voc_embedsize,args.gnn_layer_size)
+        self.GNN_thm = GNN(args.num_hops,args.thm_voc_embedsize,args.gnn_layer_size)
 
-        self.tactic_head = Tactic_Classifier()
-        self.logit_head = Theom_logit()
+        self.neck_goal = Neck(args.gnn_layer_size[-1],args.neck_layer_size)
+        self.neck_thm = Neck(args.gnn_layer_size[-1],args.neck_layer_size)
 
-        self.score_weight = params['score_weight']
-        self.tactic_weight = params['tactic_weight']
-        self.auc_weight = params['auc_weight']
+        self.tactic_head = Tactic_Classifier(args.neck_layer_size[-1],args.tac_layer_size)
+        self.logit_head = Theom_logit(args.neck_layer_size[-1],args.thm_layer_size)
 
-        self.neg_per_pos = params['neg_per_pos']
-        self.bactch_size = params['bactch_size']
-        self.word_size = params['word_size']
+        self.score_weight = args.score_weight
+        self.tactic_weight = args.tactic_weight
+        self.auc_weight = args.auc_weight
 
-        #pre compute the gt for logits
-        # tmp = np.zeros([self.bactch_size,self.bactch_size*(params['neg_per_pos']+1),1],dtype=np.int64)
-        # for i in range(self.bactch_size):
-        #     tmp[i,i*(params['neg_per_pos']+1),0]=1
-
-        # self.logits_gt = torch.tensor(tmp)
-
-        #get auc pos gather idx
+        self.neg_per_pos = args.neg_per_pos
+        self.batch_size = args.batch_size
+        self.world_size = args.world_size
         
     def regulizer(self):
         loss=0.
@@ -276,7 +264,6 @@ class GNN_net(nn.Module):
         
         delta = pos_logits-neg_logits
         delta_goal = pos_logits_goal-neg_logits_goal
-        # delta = F.leaky_relu(pos_logits-neg_logits, negative_slope=0.01, inplace=False)
 
         delta = torch.clamp(delta, min=-80., max=80.)
         delta_goal = torch.clamp(delta_goal, min=-80., max=80.)
@@ -285,9 +272,6 @@ class GNN_net(nn.Module):
         auc_loss_goal = torch.log((torch.exp(-delta_goal)+1)).view(-1)
         
         auc_loss_all = torch.mean(torch.cat((auc_loss,auc_loss_goal),-1))
-        #raise positive logits by force
-        # auc_loss+= torch.mean(1-torch.sigmoid(pos_logits))
-        # auc_loss+= torch.mean(torch.sigmoid(neg_logits))*0.2
 
         return(auc_loss_all)
 
@@ -301,14 +285,7 @@ class GNN_net(nn.Module):
         logits_gt = torch.tensor(tmp).to(device)
 
         tactic_loss =F.cross_entropy(tactic_scores,gt_tactic,reduction='mean')
-        # batch,channel = tactic_scores.shape
 
-        # gt_numpy = np.zeros([batch,channel],dtype=np.float32)
-        # for b in range(batch):
-        #     gt_numpy[b,gt_tactic[b].item()]=1.
-        # gt_torch = torch.tensor(gt_numpy).to(device)
-        # tactic_loss =F.binary_cross_entropy(torch.sigmoid(tactic_scores),gt_torch,reduction='mean')
-        # print(gt_tactic,flush=True)
         score_loss = F.binary_cross_entropy(torch.sigmoid(logits),logits_gt,reduction='mean')
 
         auc_loss = self.aucloss(logits)
@@ -316,11 +293,6 @@ class GNN_net(nn.Module):
         score_loss = score_loss*self.score_weight
         tactic_loss = tactic_loss*self.tactic_weight
         auc_loss = auc_loss*self.auc_weight
-
-        # print(tactic_loss,flush=True)
-        # loss = 0.
-        # loss = score_loss+tactic_loss+auc_loss
-        # reg_loss =self.regulizer()*1e-4
 
         reg_loss = 0.
         return(tactic_loss,score_loss,auc_loss,reg_loss)
@@ -335,18 +307,11 @@ class GNN_net(nn.Module):
         thm_start_token = self.thm_embed.tokenvectors[-2,:].view(1,-1)
         thm_end_token = self.thm_embed.tokenvectors[-1,:].view(1,-1)
 
-        # print(type(batch_goal_token),flush=True)
-        # goal_hidden_state = self.GNN_goal(batch_goal_token,input['goal_self_index_p'],
-        #                                   input['goal_parent_idx'],input['goal_root_mask'],
-        #                                   input['goal_leaf_mask'],goal_start_token,goal_end_token)
         goal_hidden_state = self.GNN_goal(batch_goal_token,
                                             input['goal_edge_p_node'],input['goal_edge_c_node'],
                                             input['goal_edge_p_indicate'],input['goal_edge_c_indicate'],
                                             input['goal_p_mask'],input['goal_c_mask'],goal_start_token,goal_end_token)
 
-        # thm_hidden_state = self.GNN_thm(batch_thm_token,input['thm_self_index_p'],
-        #                                 input['thm_parent_idx'],input['thm_root_mask'],
-        #                                 input['thm_leaf_mask'],thm_start_token,thm_end_token)
         thm_hidden_state = self.GNN_thm(batch_thm_token,
                                             input['thm_edge_p_node'],input['thm_edge_c_node'],
                                             input['thm_edge_p_indicate'],input['thm_edge_c_indicate'],

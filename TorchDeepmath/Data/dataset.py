@@ -4,17 +4,22 @@ import numpy as np
 import random
 
 class GNN_dataset(Dataset):
-    def __init__(self,goal_path,neg_thm_path,params):
+    def __init__(self,args):
         super(GNN_dataset,self).__init__()
-        self.goal_list = np.load(goal_path,allow_pickle=True).tolist()
-        self.neg_thm_list = np.load(neg_thm_path,allow_pickle=True).tolist()
-        # self.goal_list = np.load(goal_path,allow_pickle=True)
-        # self.neg_thm_list = np.load(neg_thm_path,allow_pickle=True)
+        
+        self.goal_list = np.load(args.path_goal,allow_pickle=True).tolist()
+        self.neg_thm_list = np.load(args.path_thm,allow_pickle=True).tolist()
+
+        if isinstance(self.goal_list[0],str):
+            self.load_goal = True
+        else:
+            self.load_goal = False
         print("dataset loading finished!")
 
         self.len_goal = len(self.goal_list)
         self.len_neg_thm = len(self.neg_thm_list)
-        self.params = params
+        self.params = {'neg_per_pos':args.neg_per_pos,
+                       'neg_hard_per_pos':args.neg_hard_per_pos}
 
     def _sample_one_pos(self,thms_list):
         
@@ -35,29 +40,26 @@ class GNN_dataset(Dataset):
             return(neg_hard_sample+neg_sample)
 
     def __getitem__(self,index):
-        goal_token = self.goal_list[index]['goal']['token']
-        # goal_self_index_p = self.goal_list[index]['goal']['self_index_p']
-        # goal_parent_idx = self.goal_list[index]['goal']['parent_idx']
-        # goal_root_mask = self.goal_list[index]['goal']['root_mask']
-        # goal_leaf_mask = self.goal_list[index]['goal']['leaf_mask']
+        if not self.load_goal:
+            current_goal=self.goal_list[index]
+        else:
+            # print("current path "+self.goal_list[index],flush=True)
+            current_goal = np.load(self.goal_list[index],allow_pickle=True).tolist()
+            # print(type(current_goal),flush=True)
 
-        goal_edge_p_node = self.goal_list[index]['goal']['edge_p_node']
-        goal_edge_c_node = self.goal_list[index]['goal']['edge_c_node']
-        goal_edge_p_indicate = self.goal_list[index]['goal']['edge_p_indicate']
-        goal_edge_c_indicate = self.goal_list[index]['goal']['edge_c_indicate']
-        goal_p_mask = self.goal_list[index]['goal']['p_mask']
-        goal_c_mask = self.goal_list[index]['goal']['c_mask']
+        goal_token = current_goal['goal']['token']
+        goal_edge_p_node = current_goal['goal']['edge_p_node']
+        goal_edge_c_node = current_goal['goal']['edge_c_node']
+        goal_edge_p_indicate = current_goal['goal']['edge_p_indicate']
+        goal_edge_c_indicate = current_goal['goal']['edge_c_indicate']
+        goal_p_mask = current_goal['goal']['p_mask']
+        goal_c_mask = current_goal['goal']['c_mask']  
 
-        tac_id = self.goal_list[index]['tac_id']
-        thm_pos = self._sample_one_pos(self.goal_list[index]['thms'])
-        thm_neg = self._sample_neg(self.goal_list[index]['thms_hard_negatives'])
+        tac_id = current_goal['tac_id']
+        thm_pos = self._sample_one_pos(current_goal['thms'])
+        thm_neg = self._sample_neg(current_goal['thms_hard_negatives'])
 
         thms = thm_pos+thm_neg
-        # thm_token_l = []
-        # thm_self_index_p_l = []
-        # thm_parent_idx_l = []
-        # thm_root_mask_l = []
-        # thm_leaf_mask_l = []
 
         thm_token_l = []
         thm_edge_p_node_l = []
@@ -72,10 +74,6 @@ class GNN_dataset(Dataset):
         length_list_t = []
         for thm in thms:
             thm_token_l.append(thm['token'])
-            # thm_self_index_p_l.append(thm['self_index_p']+offset)
-            # thm_parent_idx_l.append(thm['parent_idx']+offset)
-            # thm_root_mask_l.append(thm['root_mask'])
-            # thm_leaf_mask_l.append(thm['leaf_mask'])
 
             thm_edge_p_node_l.append(thm['edge_p_node']+offset)
             thm_edge_c_node_l.append(thm['edge_c_node']+offset)
@@ -88,10 +86,6 @@ class GNN_dataset(Dataset):
             length_list_t.append(thm['token'].shape[0])
 
         thm_token = np.concatenate(thm_token_l,axis=0)
-        # thm_self_index_p = np.concatenate(thm_self_index_p_l,axis=0)
-        # thm_parent_idx = np.concatenate(thm_parent_idx_l,axis=0)
-        # thm_root_mask = np.concatenate(thm_root_mask_l,axis=0)
-        # thm_leaf_mask = np.concatenate(thm_leaf_mask_l,axis=0)
 
         thm_edge_p_node = np.concatenate(thm_edge_p_node_l,axis=0)
         thm_edge_c_node = np.concatenate(thm_edge_c_node_l,axis=0)
@@ -101,12 +95,6 @@ class GNN_dataset(Dataset):
         thm_p_mask = np.concatenate(thm_p_mask_l,axis=0)
         thm_c_mask = np.concatenate(thm_c_mask_l,axis=0)       
 
-        # del thm_token_l
-        # del thm_self_index_p_l
-        # del thm_parent_idx_l
-        # del thm_root_mask_l
-        # del thm_leaf_mask_l
-
         del thm_token_l
         del thm_edge_p_node_l
         del thm_edge_c_node_l
@@ -114,22 +102,6 @@ class GNN_dataset(Dataset):
         del thm_edge_c_indicate_l
         del thm_p_mask_l
         del thm_c_mask_l
-
-        # neg_items = random.sample(self.neg_thm_list,self.params['neg_per_pos'])
-        # output = {
-        #     'goal_token':goal_token,
-        #     'goal_self_index_p':goal_self_index_p,
-        #     'goal_parent_idx':goal_parent_idx,
-        #     'goal_root_mask':goal_root_mask,
-        #     'goal_leaf_mask':goal_leaf_mask,
-        #     'thm_token':thm_token,
-        #     'thm_self_index_p':thm_self_index_p,
-        #     'thm_parent_idx':thm_parent_idx,
-        #     'thm_root_mask':thm_root_mask,
-        #     'thm_leaf_mask':thm_leaf_mask,
-        #     'tac_id':tac_id,
-        #     'length_list_t':length_list_t
-        # }
 
         output = {
             'goal_token':goal_token,

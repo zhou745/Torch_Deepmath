@@ -2,60 +2,55 @@ import TorchDeepmath as td
 import torch
 from tqdm import tqdm
 import os
+import argparse
 
-
-
+parser = argparse.ArgumentParser(description="Training Hyperparameters")
+#dataset parameter
+parser.add_argument('--neg_hard_per_pos', type=int,default=1)
+parser.add_argument('--neg_per_pos', type=int,default=15)
+parser.add_argument('--path_goal', default="/mnt/cache/zhoujingqiu/data/goal_human.npy")
+# parser.add_argument('--path_goal', default="/mnt/cache/zhoujingqiu/data/goal_human_synth.npy")
+# parser.add_argument('--path_goal', default="/mnt/cache/zhoujingqiu/data/data_goal_lr.npy")
+parser.add_argument('--path_thm', default="/mnt/cache/zhoujingqiu/data/data_thm_lr.npy")
+#training parameter
+parser.add_argument('--batch_size', type=int,default=128)
+parser.add_argument('--world_size', type=int,default=8)
+parser.add_argument('--num_node', type=int,default=1)
+parser.add_argument('--decay_rate', type=int,default=10)
+parser.add_argument('--lr', type=float,default=1e-4)
+parser.add_argument('--lr_decay', type=float,default=0.98)
+#ckpt parameter
+parser.add_argument('--save_name', default="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_0hop_small_nodrop/model_epoch")
+parser.add_argument('--load_name', default=None)
+parser.add_argument('--save_frequency', type=int,default=5)
+#model parameter
+parser.add_argument('--goal_voc_length', type=int,default=1109)
+parser.add_argument('--goal_voc_embedsize', type=int,default=128)
+parser.add_argument('--thm_voc_length', type=int,default=1193)
+parser.add_argument('--thm_voc_embedsize', type=int,default=128)
+parser.add_argument('--num_hops', type=int,default=12)
+parser.add_argument('--score_weight', type=float,default=0.2)
+parser.add_argument('--tactic_weight', type=float,default=1.0)
+parser.add_argument('--auc_weight', type=float,default=4.0)
+parser.add_argument('--gnn_layer_size', type=list,default=[256,128])
+parser.add_argument('--neck_layer_size', type=list,default=[512,1024])
+parser.add_argument('--tac_layer_size', type=list,default=[512,256,41])
+parser.add_argument('--thm_layer_size', type=int,default=[512,256,1])
 
 if __name__ == '__main__':
+    args = parser.parse_args()
+    model_type =0
 
-    neg_hard_per_pos = 1
-    neg_per_pos = 15
-    bactch_size = 128
-    word_size = 8
-    save_name="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_large_human_synth/model_epoch"
-    load_name = None
-    #  load_name = "/mnt/cache/share_data/zhoujq/ckpt/exp_pclr3/model_epoch137"
-    # load_name = "/mnt/cache/share_data/zhoujq/ckpt/exp_pclr0/savelast"
-    #  load_name = "/mnt/cache/share_data/zhoujq/ckpt/exp_init/model_epoch318"
-    decay_rate = 10
-    num_node = 1
+    # # path_goal = "/mnt/cache/zhoujingqiu/data/goal_human_synth.npy"
+    # # path_goal = "/mnt/cache/zhoujingqiu/data/data_human_synth_1_3_lr.npy"
+    # path_goal = "/mnt/cache/zhoujingqiu/data/data_goal_lr.npy"
+    # path_thm = "/mnt/cache/zhoujingqiu/data/data_thm_lr.npy"
 
-    model_type =1
-
-    path_goal = "/mnt/cache/zhoujingqiu/data/data_human_synth_1_3_lr.npy"
-    #  path_goal = "/mnt/cache/zhoujingqiu/data/data_goal_lr.npy"
-    path_thm = "/mnt/cache/zhoujingqiu/data/data_thm_lr.npy"
-
-    dataset = td.Data.dataset.GNN_dataset(path_goal,path_thm,{'neg_per_pos':neg_per_pos,'neg_hard_per_pos':neg_hard_per_pos})
+    dataset = td.Data.dataset.GNN_dataset(args)
     
     if model_type == 0:
-       model = td.Model.GNN.GNN_net({
-            'goal_voc_length':1109,
-            'goal_voc_embedsize':128,
-            'thm_voc_length':1193,
-            'thm_voc_embedsize':128,
-            'num_hops':12,
-            'score_weight':0.2,
-            'tactic_weight':1.0,
-            'auc_weight':40.0,
-            'neg_per_pos':neg_per_pos,
-            'bactch_size':bactch_size,
-            'word_size':word_size
-       })
+        model = td.Model.GNN.GNN_net(args)
     else:
-       model = td.Model.GNN_zhou.GNN_net({
-           'goal_voc_length':1109,
-           'goal_voc_embedsize':128,
-           'thm_voc_length':1193,
-           'thm_voc_embedsize':128,
-           'num_hops':16,
-           'score_weight':0.2,
-           'tactic_weight':1.0,
-            'auc_weight':4.0,
-           'neg_per_pos':neg_per_pos,
-           'bactch_size':bactch_size,
-           'word_size':word_size
-       })
-
-    td.Train.Train_GNN.TrainLoop(dataset,model,word_size,bactch_size,save_name,num_node,load_name=load_name,
-                                                                                        decay_rate=decay_rate)
+        raise RuntimeError('unknown model')
+    
+    td.Train.Train_GNN.TrainLoop(dataset,model,args)
