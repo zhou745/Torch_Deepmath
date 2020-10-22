@@ -54,7 +54,7 @@ def model_parallel(rank,pid,dist_url,dataset,model,args):
     data_loader = torch.utils.data.DataLoader(dataset,batch_size=args.batch_size//args.world_size,
                                                             collate_fn=Batch_collect,
                                                             sampler=sampler,
-                                                            num_workers=4)
+                                                            num_workers=args.num_worker)
     print("loader build finished",flush=True) 
     # swa_model = AveragedModel(model_new,avg_fn = lambda ap, mp, nv:0.01*mp+0.99*ap)
     swa_model = AveragedModel(model_new,avg_fn = lambda ap, mp, nv:0.0002*mp+0.9998*ap)
@@ -68,6 +68,7 @@ def model_parallel(rank,pid,dist_url,dataset,model,args):
 
         f = open(args.save_name+"log","w")
         f.close()
+        np.save(args.save_name+"_config",args)
     # model_new.to(device)
     #borad cast the initial weight as the same
     for parameter in model_new.parameters():
@@ -81,6 +82,7 @@ def model_parallel(rank,pid,dist_url,dataset,model,args):
         sampler.set_epoch(idx)
         print("set epoch finished",flush=True)
         dist.barrier()
+        step = 0
         for item in tqdm(data_loader):
             # pass
             tactic_loss,score_loss,auc_loss,reg_loss = model_new(item)
@@ -107,10 +109,11 @@ def model_parallel(rank,pid,dist_url,dataset,model,args):
                 f = open(args.save_name+"log","a")
                 f.write(log_str)
                 f.close()
-                print("At epoch "+str(idx)+" the current loss is "+str(loss_out.item())+
+                print("At epoch "+str(idx)+" step "+str(step)+" the current loss is "+str(loss_out.item())+
                         " tactic "+str(tactic_out.item())+
                         " score "+str(score_out.item())+
                         " auc "+str(auc_out.item()),flush=True)
+                step+=1
         dist.barrier()
 
         if idx%args.decay_rate == (args.decay_rate-1):
@@ -118,7 +121,7 @@ def model_parallel(rank,pid,dist_url,dataset,model,args):
                 g['lr'] = g['lr']*args.lr_decay
         if rank==0 and idx%args.save_frequency==0:
             torch.save(swa_model.state_dict(), args.save_name+str(idx))
-            torch.save(model_new.state_dict(), args.save_name+str(idx)+"master_copy")
+            torch.save(model_new.state_dict(), args.save_name+str(idx)+"_master_copy")
         idx=idx+1  
 
     cleanup()
@@ -166,8 +169,8 @@ def ValLoop(dataset,model,args):
     device = torch.device('cuda:0')
     model.to(device)
     model.train(False)
-    print(torch.sum(torch.abs(model.goal_embed.tokenvectors[8,:])),flush=True)
-    print(torch.sum(torch.abs(model.thm_embed.tokenvectors[8,:])),flush=True)
+    # print(torch.sum(torch.abs(model.goal_embed.tokenvectors[8,:])),flush=True)
+    # print(torch.sum(torch.abs(model.thm_embed.tokenvectors[8,:])),flush=True)
     # model.eval()
 
     N_all = 0

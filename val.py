@@ -10,8 +10,8 @@ parser = argparse.ArgumentParser(description="Training Hyperparameters")
 #dataset parameter
 parser.add_argument('--neg_hard_per_pos', type=int,default=1)
 parser.add_argument('--neg_per_pos', type=int,default=15)
-parser.add_argument('--path_goal', default="/mnt/cache/zhoujingqiu/data/goal_human_synth.npy")
-# parser.add_argument('--path_goal', default="/mnt/cache/zhoujingqiu/data/data_goal_lr.npy")
+# parser.add_argument('--path_goal', default="/mnt/cache/zhoujingqiu/data/goal_human_synth.npy")
+parser.add_argument('--path_goal', default="/mnt/cache/zhoujingqiu/data/data_goal_valid_small.npy")
 parser.add_argument('--path_thm', default="/mnt/cache/zhoujingqiu/data/data_thm_lr.npy")
 #training parameter
 parser.add_argument('--batch_size', type=int,default=128)
@@ -29,7 +29,7 @@ parser.add_argument('--goal_voc_length', type=int,default=1109)
 parser.add_argument('--goal_voc_embedsize', type=int,default=128)
 parser.add_argument('--thm_voc_length', type=int,default=1193)
 parser.add_argument('--thm_voc_embedsize', type=int,default=128)
-parser.add_argument('--num_hops', type=int,default=13)
+parser.add_argument('--num_hops', type=int,default=0)
 parser.add_argument('--score_weight', type=float,default=0.2)
 parser.add_argument('--tactic_weight', type=float,default=1.0)
 parser.add_argument('--auc_weight', type=int,default=4.0)
@@ -37,8 +37,9 @@ parser.add_argument('--gnn_layer_size', type=list,default=[256,128])
 parser.add_argument('--neck_layer_size', type=list,default=[512,1024])
 parser.add_argument('--tac_layer_size', type=list,default=[512,256,41])
 parser.add_argument('--thm_layer_size', type=int,default=[1024,512,1])
-
-
+# parser.add_argument('--neck_layer_size', type=list,default=[512,4096])
+# parser.add_argument('--tac_layer_size', type=list,default=[1024,256,41])
+# parser.add_argument('--thm_layer_size', type=int,default=[2048,256,1])
 
 if __name__ == '__main__':
     args = parser.parse_args()
@@ -46,11 +47,10 @@ if __name__ == '__main__':
     torch.manual_seed(0)
 
     model_size =0
-    # save_name = "/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_nodrop_small_loadscratch/model_epoch292"
-    # save_name = "/mnt/cache/share_data/zhoujq/ckpt/exp_init/model_epoch318"
-    # save_name="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_load318/model_epoch90"
-    args.load_name="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_10times_auc/model_epoch170"
-    # save_name="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_large_human_synth/model_epoch8"
+    # args.load_name = "/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_12hop_small_nodrop_human/model_epoch20"
+    # args.load_name = "/mnt/cache/share_data/zhoujq/ckpt/exp_init/model_epoch318"
+    args.load_name = "/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_0hop_small_nodrop_human/model_epoch50"
+    # args.load_name="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_16hop_large_nodrop_human_synth/model_epoch0"
 
     # dataset = td.Data.dataset.GNN_dataset("../data/data_goal_lr.npy","../data/data_thm_lr.npy",{'neg_per_pos':neg_per_pos,'neg_hard_per_pos':neg_hard_per_pos})
     dataset = td.Data.dataset.GNN_dataset(args)
