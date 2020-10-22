@@ -29,14 +29,14 @@ parser.add_argument('--goal_voc_length', type=int,default=1109)
 parser.add_argument('--goal_voc_embedsize', type=int,default=128)
 parser.add_argument('--thm_voc_length', type=int,default=1193)
 parser.add_argument('--thm_voc_embedsize', type=int,default=128)
-parser.add_argument('--num_hops', type=int,default=0)
+parser.add_argument('--num_hops', type=int,default=13)
 parser.add_argument('--score_weight', type=float,default=0.2)
 parser.add_argument('--tactic_weight', type=float,default=1.0)
-parser.add_argument('--auc_weight', type=int,default=0)
+parser.add_argument('--auc_weight', type=int,default=4.0)
 parser.add_argument('--gnn_layer_size', type=list,default=[256,128])
 parser.add_argument('--neck_layer_size', type=list,default=[512,1024])
 parser.add_argument('--tac_layer_size', type=list,default=[512,256,41])
-parser.add_argument('--thm_layer_size', type=int,default=[512,256,1])
+parser.add_argument('--thm_layer_size', type=int,default=[1024,512,1])
 
 
 
