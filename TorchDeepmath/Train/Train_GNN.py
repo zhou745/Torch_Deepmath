@@ -5,6 +5,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim.swa_utils import AveragedModel
 import torch.distributed as dist
 import torch.multiprocessing as mp
+import numpy as np
 import os
 from TorchDeepmath.Data.dataset import Batch_collect
 from collections import OrderedDict
@@ -36,7 +37,7 @@ def model_parallel(rank,pid,dist_url,dataset,model,args):
 
     model_new = model.to(gpu)
     if args.load_name is not None:
-        state_dict = torch.load(load_name,map_location=torch.device('cuda:'+str(gpu)))
+        state_dict = torch.load(args.load_name,map_location=torch.device('cuda:'+str(gpu)))
         new_state_dict = OrderedDict()
 
         for k, v in state_dict.items():
