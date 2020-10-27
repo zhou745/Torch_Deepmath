@@ -69,6 +69,132 @@ class Tokenstore(nn.Module):
             end_token = self.tokenvectors(self.end_index)
         return(end_token)
 
+class GNN_NODROP(nn.Module):
+    def __init__(self,num_hops,embed_size,layer_size=[256,128]):
+        super(GNN_NODROP,self).__init__()
+
+        self.num_hops = num_hops
+        self.embed_size = embed_size
+        if self.num_hops>0:
+            self.MLP_V = MLP_NODROP(self.embed_size,layer_size)
+        if self.num_hops>1:
+            self.MLP_E = MLP_NODROP(1,layer_size)
+            self.MLP_p = MLP_NODROP(3*self.embed_size,layer_size)
+            self.MLP_c = MLP_NODROP(3*self.embed_size,layer_size)
+            self.MLP_aggr = MLP_NODROP(3*self.embed_size,layer_size)
+    
+    def forward(self,batch_token,edge_p_node,edge_c_node,edge_p_indicate,edge_c_indicate,
+                     p_mask,c_mask,start_token,end_token):
+        # print(batch_token,flush=True)
+
+        Num_node = batch_token.shape[0]
+        if self.num_hops>0:
+            hidden_state = batch_token+self.MLP_V(batch_token)
+        else:
+            hidden_state = batch_token
+       
+        #compute the edge initial embed
+        if self.num_hops>1:
+            edge_p = self.MLP_E(edge_p_indicate.view(-1,1))
+            edge_c = self.MLP_E(edge_c_indicate.view(-1,1))
+
+        #main gnn loops
+        for hop in range(self.num_hops-1):
+            #gather node
+            edge_p_node_batch = hidden_state[edge_p_node,:]
+            edge_c_node_batch = hidden_state[edge_c_node,:]
+
+            #concat the input
+            edge_p_input = torch.cat([edge_c_node_batch,edge_p_node_batch, edge_p],-1)
+            edge_c_input = torch.cat([edge_p_node_batch,edge_c_node_batch, edge_c],-1)
+            
+            S_p = self.MLP_p(edge_p_input)
+            S_c = self.MLP_c(edge_c_input)
+
+            S_p = torch_scatter.scatter_mean(S_p,edge_p_node,dim=0,dim_size=Num_node)
+            S_c = torch_scatter.scatter_mean(S_c,edge_c_node,dim=0,dim_size=Num_node)
+
+            S_p=S_p + p_mask.view(-1,1)*start_token
+            S_c=S_c + c_mask.view(-1,1)*end_token
+
+            x_aggr = torch.cat([hidden_state,S_p,S_c],-1)
+            hidden_state = hidden_state+self.MLP_aggr(x_aggr)
+            hidden_state = F.relu(hidden_state)
+
+        return(hidden_state)
+
+class GNN_res(nn.Module):
+    def __init__(self,num_hops,embed_size,layer_size=[256,128]):
+        super(GNN_res,self).__init__()
+
+        self.num_hops = num_hops
+        self.embed_size = embed_size
+        if self.num_hops>0:
+            self.MLP_V = MLP(self.embed_size,layer_size)
+        if self.num_hops>1:
+            self.MLP_E = MLP(1,layer_size)
+            self.MLP_p = MLP(3*self.embed_size,layer_size)
+            self.MLP_c = MLP(3*self.embed_size,layer_size)
+            self.MLP_aggr = MLP(3*self.embed_size,layer_size)
+    
+    def forward(self,batch_token,edge_p_node,edge_c_node,edge_p_indicate,edge_c_indicate,
+                     p_mask,c_mask,start_token,end_token):
+        # print(batch_token,flush=True)
+
+        Num_node = batch_token.shape[0]
+        if self.num_hops>0:
+            hidden_state = batch_token+self.MLP_V(batch_token)
+        else:
+            hidden_state = batch_token
+       
+        #compute the edge initial embed
+        if self.num_hops>1:
+            edge_p = self.MLP_E(edge_p_indicate.view(-1,1))
+            edge_c = self.MLP_E(edge_c_indicate.view(-1,1))
+
+        #main gnn loops
+        for hop in range(self.num_hops-1):
+            #gather node
+            edge_p_node_batch = hidden_state[edge_p_node,:]
+            edge_c_node_batch = hidden_state[edge_c_node,:]
+
+            #concat the input
+            edge_p_input = torch.cat([edge_c_node_batch,edge_p_node_batch, edge_p],-1)
+            edge_c_input = torch.cat([edge_p_node_batch,edge_c_node_batch, edge_c],-1)
+            
+            S_p = self.MLP_p(edge_p_input)
+            S_c = self.MLP_c(edge_c_input)
+
+            S_p = torch_scatter.scatter_mean(S_p,edge_p_node,dim=0,dim_size=Num_node)
+            S_c = torch_scatter.scatter_mean(S_c,edge_c_node,dim=0,dim_size=Num_node)
+
+            S_p=S_p + p_mask.view(-1,1)*start_token
+            S_c=S_c + c_mask.view(-1,1)*end_token
+
+            x_aggr = torch.cat([hidden_state,S_p,S_c],-1)
+            hidden_state = hidden_state+self.MLP_aggr(x_aggr)
+            hidden_state = F.relu(hidden_state)
+
+        return(hidden_state)
+
+class MLP_NODROP(nn.Module):
+    def __init__(self,input_size,layer_size=[256,128]):
+        super(MLP_NODROP,self).__init__()
+
+        self.model = nn.Sequential(
+            nn.Linear(input_size,layer_size[0]),
+            nn.ReLU(),
+            nn.Linear(layer_size[0],layer_size[1]),
+            nn.ReLU()
+        )
+        
+        for p in self.model.parameters():
+            init.uniform_(p, a=init_a, b=init_b)
+        
+    
+    def forward(self,input):
+        return(self.model(input))
+
 class MLP(nn.Module):
     def __init__(self,input_size,layer_size=[256,128]):
         super(MLP,self).__init__()
@@ -123,7 +249,6 @@ class GNN(nn.Module):
             edge_p_node_batch = hidden_state[edge_p_node,:]
             edge_c_node_batch = hidden_state[edge_c_node,:]
 
-
             #concat the input
             edge_p_input = torch.cat([edge_c_node_batch,edge_p_node_batch, edge_p],-1)
             edge_c_input = torch.cat([edge_p_node_batch,edge_c_node_batch, edge_c],-1)
@@ -136,7 +261,7 @@ class GNN(nn.Module):
 
             S_p=S_p + p_mask.view(-1,1)*start_token
             S_c=S_c + c_mask.view(-1,1)*end_token
-    
+
             x_aggr = torch.cat([hidden_state,S_p,S_c],-1)
             hidden_state = hidden_state+self.MLP_aggr(x_aggr)
             hidden_state = F.relu(hidden_state)
@@ -295,9 +420,21 @@ class GNN_net(nn.Module):
         self.thm_embed=Tokenstore(args.thm_voc_length,args.thm_voc_embedsize,args.use_embed,args.max_norm)
 
         self.num_hops = args.num_hops
-
-        self.GNN_goal = GNN(args.num_hops,args.goal_voc_embedsize,args.gnn_layer_size)
-        self.GNN_thm = GNN(args.num_hops,args.thm_voc_embedsize,args.gnn_layer_size)
+        if hasattr(args, 'gnn_module'):
+            if args.gnn_module == "GNN":
+                self.GNN_goal = GNN(args.num_hops,args.goal_voc_embedsize,args.gnn_layer_size)
+                self.GNN_thm = GNN(args.num_hops,args.thm_voc_embedsize,args.gnn_layer_size)
+            elif args.gnn_module == "GNN_NODROP":
+                self.GNN_goal = GNN_NODROP(args.num_hops,args.goal_voc_embedsize,args.gnn_layer_size)
+                self.GNN_thm = GNN_NODROP(args.num_hops,args.thm_voc_embedsize,args.gnn_layer_size)
+            elif args.gnn_module == "GNN_res":
+                self.GNN_goal = GNN_res(args.num_hops,args.goal_voc_embedsize,args.gnn_layer_size)
+                self.GNN_thm = GNN_res(args.num_hops,args.thm_voc_embedsize,args.gnn_layer_size)                
+            else:
+                raise RuntimeError('unknown gnn type')
+        else:
+            self.GNN_goal = GNN(args.num_hops,args.goal_voc_embedsize,args.gnn_layer_size)
+            self.GNN_thm = GNN(args.num_hops,args.thm_voc_embedsize,args.gnn_layer_size)
         
         if hasattr(args, 'neck_module'):
             if args.neck_module == "neck":
@@ -362,8 +499,8 @@ class GNN_net(nn.Module):
         delta = pos_logits-neg_logits
         delta_goal = pos_logits_goal-neg_logits_goal
 
-        delta = torch.clamp(delta, min=-80., max=80.)
-        delta_goal = torch.clamp(delta_goal, min=-80., max=80.)
+        delta = torch.clamp(delta, min=-80., max=800.)
+        delta_goal = torch.clamp(delta_goal, min=-80., max=800.)
 
         auc_loss = torch.log((torch.exp(-delta)+1)).view(-1)
         auc_loss_goal = torch.log((torch.exp(-delta_goal)+1)).view(-1)

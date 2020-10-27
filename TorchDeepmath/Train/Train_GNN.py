@@ -58,7 +58,7 @@ def model_parallel(rank,pid,dist_url,dataset,model,args):
                                                             num_workers=args.num_worker)
     print("loader build finished",flush=True) 
     # swa_model = AveragedModel(model_new,avg_fn = lambda ap, mp, nv:0.01*mp+0.99*ap)
-    swa_model = AveragedModel(model_new,avg_fn = lambda ap, mp, nv:0.0002*mp+0.9998*ap)
+    swa_model = AveragedModel(model_new,avg_fn = lambda ap, mp, nv:0.0001*mp+0.9999*ap)
     # swa_model = AveragedModel(model_new,avg_fn = lambda ap, mp, nv:0.05*mp+0.95*ap)
 
     if rank==0:
@@ -116,6 +116,8 @@ def model_parallel(rank,pid,dist_url,dataset,model,args):
                         " auc "+str(auc_out.item()),flush=True)
                 step+=1
         dist.barrier()
+        for parameter in model_new.parameters():
+            torch.distributed.broadcast(parameter,0,async_op=False)
 
         if idx%args.decay_rate == (args.decay_rate-1):
             for g in optimizer.param_groups:
@@ -182,6 +184,10 @@ def ValLoop(dataset,model,args):
     for item in tqdm(data_loader):
         for k in item.keys():
             item[k]=item[k].to(device)
+        # print("----------------------------------",flush=True)
+        # print(item['thm_edge_p_indicate'],flush=True)
+        # print("==================================",flush=True)
+        # print(item['thm_edge_c_indicate'],flush=True)
         result = model(item)
 
         tactic = result['tactic_scores']
