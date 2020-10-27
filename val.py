@@ -27,9 +27,11 @@ if __name__ == '__main__':
     # load_path = "/mnt/cache/zhoujingqiu/configs/exp_pclr_1hop_small_remove_relu_lr8_no_drop.npy"
     # load_path = "/mnt/cache/zhoujingqiu/configs/exp_pclr_2hop_small_remove_relu_lr8_no_drop.npy"
     load_path = "/mnt/cache/zhoujingqiu/configs/exp_pclr_12hop_small_remove_relu_lr8_no_drop.npy"
+    # load_path = "/mnt/cache/zhoujingqiu/configs/exp_pclr_12hop_small_remove_relu_lr8_noshare.npy"
+    # load_path = "/mnt/cache/zhoujingqiu/configs/exp_pclr_12hop_small_remove_relu_lr16_noshare.npy"
     # load_path = "/mnt/cache/zhoujingqiu/configs/exp_pclr_16hop_small_remove_relu_lr8_no_drop.npy"
     # load_path = "/mnt/cache/zhoujingqiu/configs/exp_pclr_2hop_small_remove_relu_lr8_drop.npy"
-    # load_path = "/mnt/cache/zhoujingqiu/configs/exp_pclr_4hop_small_remove_relu_lr8_drop.npy"
+    # load_path = "/mnt/cache/zhoujingqiu/configs/exp_pclr_4hop_small_remove_relu_lr8_no_drop.npy"
     args = np.load(load_path,allow_pickle=True).tolist()
 
     random.seed(0)
@@ -43,9 +45,11 @@ if __name__ == '__main__':
     # args.load_name="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_1hop_small_remove_relu_lr8/model_epoch20"
     # args.load_name="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_1hop_small_remove_relu_lr8_no_drop/model_epoch175"
     # args.load_name="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_2hop_small_remove_relu_lr8_no_drop/model_epoch100"
-    # args.load_name="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_2hop_small_remove_relu_lr8_drop/model_epoch100"
-    # args.load_name="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_4hop_small_remove_relu_lr8_drop/model_epoch100"
-    args.load_name="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_12hop_small_remove_relu_lr8_no_drop/model_epoch105"
+    # args.load_name="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_2hop_small_remove_relu_lr8_drop/model_epoch20"
+    # args.load_name="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_12hop_small_remove_relu_lr8_noshare/model_epoch10"
+    # args.load_name="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_12hop_small_remove_relu_lr16_noshare/model_epoch40_master_copy"
+    # args.load_name="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_4hop_small_remove_relu_lr8_no_drop/model_epoch10"
+    args.load_name="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_12hop_small_remove_relu_lr8_no_drop/model_epoch150"
     # args.load_name="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_16hop_small_remove_relu_lr8_no_drop/model_epoch15"
     # args.load_name="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_2hop_small_remove_relu_lr4/model_epoch180"
     # args.load_name="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_2hop_small_remove_relu_lr8_auc100/model_epoch10"
