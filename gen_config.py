@@ -19,7 +19,7 @@ parser.add_argument('--lr_decay', type=float,default=0.98)
 # parser.add_argument('--num_worker', type=int,default=4)
 parser.add_argument('--num_worker', type=int,default=0)
 #ckpt parameter
-parser.add_argument('--save_name', default="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_12hop_small_remove_relu_lr1_noshare_xavier/model_epoch")
+parser.add_argument('--save_name', default="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_0hop_small_remove_relu_lr1_noshare_xavier_resneck/model_epoch")
 parser.add_argument('--load_name', default=None)
 parser.add_argument('--save_frequency', type=int,default=5)
 #model parameter
@@ -27,7 +27,7 @@ parser.add_argument('--goal_voc_length', type=int,default=1109)
 parser.add_argument('--goal_voc_embedsize', type=int,default=128)
 parser.add_argument('--thm_voc_length', type=int,default=1193)
 parser.add_argument('--thm_voc_embedsize', type=int,default=128)
-parser.add_argument('--num_hops', type=int,default=12)
+parser.add_argument('--num_hops', type=int,default=0)
 parser.add_argument('--score_weight', type=float,default=0.2)
 parser.add_argument('--tactic_weight', type=float,default=1.0)
 parser.add_argument('--auc_weight', type=float,default=4.0)
@@ -41,7 +41,8 @@ parser.add_argument('--thm_layer_size', type=int,default=[1024,512,1])
 # parser.add_argument('--gnn_module', default="GNN")
 parser.add_argument('--gnn_module', default="GNN_noshare")
 # parser.add_argument('--gnn_module', default="GNN_NODROP")
-parser.add_argument('--neck_module', default="neck_exp")
+# parser.add_argument('--neck_module', default="neck_exp")
+parser.add_argument('--neck_module', default="neck_res")
 parser.add_argument('--tac_module', default="tac")
 parser.add_argument('--thm_module', default="thm")
 
@@ -51,5 +52,5 @@ parser.add_argument('--thm_module', default="thm")
 
 if __name__ == '__main__':
     args = parser.parse_args()
-    save_name = "/mnt/cache/zhoujingqiu/configs/exp_pclr_12hop_small_remove_relu_lr1_noshare_xavier"
+    save_name = "/mnt/cache/zhoujingqiu/configs/exp_pclr_0hop_small_remove_relu_lr1_noshare_xavier_resneck"
     np.save(save_name,args)

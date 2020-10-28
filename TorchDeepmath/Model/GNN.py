@@ -245,7 +245,7 @@ class MLP_NODROP(nn.Module):
         
         for p in self.model.parameters():
             if len(p.data.shape)<2:
-                init.uniform_(p, a=init_a, b=init_b)
+                init.zeros_(p)
             else:
                 init.xavier_normal_(p)
         
@@ -267,7 +267,7 @@ class MLP(nn.Module):
         
         for p in self.model.parameters():
             if len(p.data.shape)<2:
-                init.uniform_(p, a=init_a, b=init_b)
+                init.zeros_(p)
             else:
                 init.xavier_normal_(p)
         
@@ -347,7 +347,7 @@ class Neck_drop(nn.Module):
 
         for p in self.model.parameters():
             if len(p.data.shape)<2:
-                init.uniform_(p, a=init_a, b=init_b)
+                init.zeros_(p)
             else:
                 init.xavier_normal_(p)
 
@@ -359,6 +359,38 @@ class Neck_drop(nn.Module):
         # print(batch_neck_allnode,flush=True)
         # print(batch_neck_graph,flush=True) 
         # print(idx_,flush=True)
+        return(batch_neck_graph)
+
+class Neck_res(nn.Module):
+    def __init__(self,embed_size,filters=[512,1024]):
+        super(Neck_res,self).__init__()
+
+        self.embed_size = embed_size
+        self.filters=filters
+
+        self.upsample = self.filters[-1]//self.embed_size
+        
+       
+        self.model = nn.Sequential(
+            nn.Linear(self.embed_size,self.filters[0]),
+            nn.ReLU(),
+            nn.Linear(self.filters[0],self.filters[1])
+        )
+
+        for p in self.model.parameters():
+            if len(p.data.shape)<2:
+                init.zeros_(p)
+            else:
+                init.xavier_normal_(p)
+
+    def forward(self,batch_gnn_embed,gather_idx,num_graph):
+        # print(batch_gnn_embed,flush=True)
+        batch_neck_allnode = self.model(batch_gnn_embed)
+        batch_neck_allnode_expand = batch_gnn_embed.repeat(1,self.upsample)
+
+        batch_neck_allnode = batch_neck_allnode+batch_neck_allnode_expand
+        batch_neck_graph,idx_ = torch_scatter.scatter_max(batch_neck_allnode,gather_idx,dim=0,dim_size=num_graph)
+
         return(batch_neck_graph)
 
 class Neck_exp(nn.Module):
@@ -377,7 +409,7 @@ class Neck_exp(nn.Module):
 
         for p in self.model.parameters():
             if len(p.data.shape)<2:
-                init.uniform_(p, a=init_a, b=init_b)
+                init.zeros_(p)
             else:
                 init.xavier_normal_(p)
 
@@ -386,9 +418,6 @@ class Neck_exp(nn.Module):
         batch_neck_allnode = self.model(batch_gnn_embed)
 
         batch_neck_graph,idx_ = torch_scatter.scatter_max(batch_neck_allnode,gather_idx,dim=0,dim_size=num_graph)
-        # print(batch_neck_allnode,flush=True)
-        # print(batch_neck_graph,flush=True) 
-        # print(idx_,flush=True)
         return(batch_neck_graph)
 
 class Neck_bow(nn.Module):
@@ -397,10 +426,8 @@ class Neck_bow(nn.Module):
 
     def forward(self,batch_gnn_embed,gather_idx,num_graph):
         # print(batch_gnn_embed,flush=True)
-        batch_neck_graph,idx_ = torch_scatter.scatter_max(batch_neck_allnode,gather_idx,dim=0,dim_size=num_graph)
-        # print(batch_neck_allnode,flush=True)
-        # print(batch_neck_graph,flush=True) 
-        # print(idx_,flush=True)
+        batch_neck_graph,idx_ = torch_scatter.scatter_max(batch_gnn_embed,gather_idx,dim=0,dim_size=num_graph)
+
         return(batch_neck_graph)
 
 class Neck(nn.Module):
@@ -420,7 +447,7 @@ class Neck(nn.Module):
 
         for p in self.model.parameters():
             if len(p.data.shape)<2:
-                init.uniform_(p, a=init_a, b=init_b)
+                init.zeros_(p)
             else:
                 init.xavier_normal_(p)
 
@@ -456,7 +483,7 @@ class Tactic_Classifier(nn.Module):
 
         for p in self.model.parameters():
             if len(p.data.shape)<2:
-                init.uniform_(p, a=init_a, b=init_b)
+                init.zeros_(p)
             else:
                 init.xavier_normal_(p)
     
@@ -483,7 +510,7 @@ class Theom_logit(nn.Module):
 
         for p in self.model.parameters():
             if len(p.data.shape)<2:
-                init.uniform_(p, a=init_a, b=init_b)
+                init.zeros_(p)
             else:
                 init.xavier_normal_(p)
 
@@ -540,7 +567,10 @@ class GNN_net(nn.Module):
                 self.neck_thm = Neck_drop(args.gnn_layer_size[-1],args.neck_layer_size)
             elif args.neck_module == "neck_bow":
                 self.neck_goal = Neck_bow()
-                self.neck_thm = Neck_bow()               
+                self.neck_thm = Neck_bow()
+            elif args.neck_module == "neck_res":
+                self.neck_goal = Neck_res(args.gnn_layer_size[-1],args.neck_layer_size)
+                self.neck_thm = Neck_res(args.gnn_layer_size[-1],args.neck_layer_size)                    
             else:
                 raise RuntimeError('unknown neck type')
         else:
