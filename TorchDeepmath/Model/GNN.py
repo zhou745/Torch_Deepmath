@@ -41,8 +41,8 @@ class Tokenstore(nn.Module):
         else:
             self.tokenvectors=torch.nn.Embedding(self.voc_length+2,self.voc_embedsize,max_norm=max_norm)
 
-        for p in self.parameters():
-            init.uniform_(p, a=init_a, b=init_b)
+        # for p in self.parameters():
+        #     init.uniform_(p, a=init_a, b=init_b)
     
     def forward(self,token_idx):
         if not self.use_embed:
@@ -82,7 +82,7 @@ class GNN_noshare(nn.Module):
             
             self.MLP_p_list = nn.ModuleList([MLP(3*self.embed_size,layer_size) for i in range(self.num_hops-1)])
             self.MLP_c_list = nn.ModuleList([MLP(3*self.embed_size,layer_size) for i in range(self.num_hops-1)])
-            self.MLP_aggr_list = nn.ModuleList([MLP(3*self.embed_size,layer_size) for i in range(self.num_hops-1)])
+            self.MLP_aggr = MLP(3*self.embed_size,layer_size)
 
     def forward(self,batch_token,edge_p_node,edge_c_node,edge_p_indicate,edge_c_indicate,
                      p_mask,c_mask,start_token,end_token):
@@ -119,7 +119,7 @@ class GNN_noshare(nn.Module):
             S_c=S_c + c_mask.view(-1,1)*end_token
 
             x_aggr = torch.cat([hidden_state,S_p,S_c],-1)
-            hidden_state = hidden_state+self.MLP_aggr_list[hop](x_aggr)
+            hidden_state = hidden_state+self.MLP_aggr(x_aggr)
             hidden_state = F.relu(hidden_state)
 
         return(hidden_state)
@@ -244,7 +244,10 @@ class MLP_NODROP(nn.Module):
         )
         
         for p in self.model.parameters():
-            init.uniform_(p, a=init_a, b=init_b)
+            if len(p.data.shape)<2:
+                init.uniform_(p, a=init_a, b=init_b)
+            else:
+                init.xavier_normal_(p)
         
     
     def forward(self,input):
@@ -263,7 +266,10 @@ class MLP(nn.Module):
         )
         
         for p in self.model.parameters():
-            init.uniform_(p, a=init_a, b=init_b)
+            if len(p.data.shape)<2:
+                init.uniform_(p, a=init_a, b=init_b)
+            else:
+                init.xavier_normal_(p)
         
     
     def forward(self,input):
@@ -282,6 +288,7 @@ class GNN(nn.Module):
             self.MLP_p = MLP(3*self.embed_size,layer_size)
             self.MLP_c = MLP(3*self.embed_size,layer_size)
             self.MLP_aggr = MLP(3*self.embed_size,layer_size)
+
     
     def forward(self,batch_token,edge_p_node,edge_c_node,edge_p_indicate,edge_c_indicate,
                      p_mask,c_mask,start_token,end_token):
@@ -339,7 +346,10 @@ class Neck_drop(nn.Module):
         )
 
         for p in self.model.parameters():
-            init.uniform_(p, a=init_a, b=init_b)
+            if len(p.data.shape)<2:
+                init.uniform_(p, a=init_a, b=init_b)
+            else:
+                init.xavier_normal_(p)
 
     def forward(self,batch_gnn_embed,gather_idx,num_graph):
         # print(batch_gnn_embed,flush=True)
@@ -366,12 +376,27 @@ class Neck_exp(nn.Module):
         )
 
         for p in self.model.parameters():
-            init.uniform_(p, a=init_a, b=init_b)
+            if len(p.data.shape)<2:
+                init.uniform_(p, a=init_a, b=init_b)
+            else:
+                init.xavier_normal_(p)
 
     def forward(self,batch_gnn_embed,gather_idx,num_graph):
         # print(batch_gnn_embed,flush=True)
         batch_neck_allnode = self.model(batch_gnn_embed)
 
+        batch_neck_graph,idx_ = torch_scatter.scatter_max(batch_neck_allnode,gather_idx,dim=0,dim_size=num_graph)
+        # print(batch_neck_allnode,flush=True)
+        # print(batch_neck_graph,flush=True) 
+        # print(idx_,flush=True)
+        return(batch_neck_graph)
+
+class Neck_bow(nn.Module):
+    def __init__(self):
+        super(Neck_bow,self).__init__()
+
+    def forward(self,batch_gnn_embed,gather_idx,num_graph):
+        # print(batch_gnn_embed,flush=True)
         batch_neck_graph,idx_ = torch_scatter.scatter_max(batch_neck_allnode,gather_idx,dim=0,dim_size=num_graph)
         # print(batch_neck_allnode,flush=True)
         # print(batch_neck_graph,flush=True) 
@@ -394,7 +419,10 @@ class Neck(nn.Module):
         )
 
         for p in self.model.parameters():
-            init.uniform_(p, a=init_a, b=init_b)
+            if len(p.data.shape)<2:
+                init.uniform_(p, a=init_a, b=init_b)
+            else:
+                init.xavier_normal_(p)
 
     def forward(self,batch_gnn_embed,gather_idx,num_graph):
         # print(batch_gnn_embed,flush=True)
@@ -427,7 +455,10 @@ class Tactic_Classifier(nn.Module):
         )
 
         for p in self.model.parameters():
-            init.uniform_(p, a=init_a, b=init_b)
+            if len(p.data.shape)<2:
+                init.uniform_(p, a=init_a, b=init_b)
+            else:
+                init.xavier_normal_(p)
     
     def forward(self,batch_goal_neck):
         return(self.model(batch_goal_neck))
@@ -451,7 +482,10 @@ class Theom_logit(nn.Module):
         )
 
         for p in self.model.parameters():
-            init.uniform_(p, a=init_a, b=init_b)
+            if len(p.data.shape)<2:
+                init.uniform_(p, a=init_a, b=init_b)
+            else:
+                init.xavier_normal_(p)
 
     def forward(self,batch_goal,batch_thm):
         batch_goal_reshaped = batch_goal.view(-1,1,self.embed_size)
@@ -504,6 +538,9 @@ class GNN_net(nn.Module):
             elif args.neck_module == "neck_drop":
                 self.neck_goal = Neck_drop(args.gnn_layer_size[-1],args.neck_layer_size)
                 self.neck_thm = Neck_drop(args.gnn_layer_size[-1],args.neck_layer_size)
+            elif args.neck_module == "neck_bow":
+                self.neck_goal = Neck_bow()
+                self.neck_thm = Neck_bow()               
             else:
                 raise RuntimeError('unknown neck type')
         else:

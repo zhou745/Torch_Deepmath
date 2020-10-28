@@ -10,16 +10,16 @@ parser.add_argument('--neg_per_pos', type=int,default=15)
 parser.add_argument('--path_goal', default="/mnt/cache/zhoujingqiu/data/data_goal_lr.npy")
 parser.add_argument('--path_thm', default="/mnt/cache/zhoujingqiu/data/data_thm_lr.npy")
 #training parameter
-parser.add_argument('--batch_size', type=int,default=256)
-parser.add_argument('--world_size', type=int,default=16)
-parser.add_argument('--num_node', type=int,default=2)
+parser.add_argument('--batch_size', type=int,default=128)
+parser.add_argument('--world_size', type=int,default=8)
+parser.add_argument('--num_node', type=int,default=1)
 parser.add_argument('--decay_rate', type=int,default=10)
-parser.add_argument('--lr', type=float,default=1.6e-3)
+parser.add_argument('--lr', type=float,default=1e-4)
 parser.add_argument('--lr_decay', type=float,default=0.98)
 # parser.add_argument('--num_worker', type=int,default=4)
 parser.add_argument('--num_worker', type=int,default=0)
 #ckpt parameter
-parser.add_argument('--save_name', default="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_12hop_small_remove_relu_lr16_noshare/model_epoch")
+parser.add_argument('--save_name', default="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_12hop_small_remove_relu_lr1_noshare_xavier/model_epoch")
 parser.add_argument('--load_name', default=None)
 parser.add_argument('--save_frequency', type=int,default=5)
 #model parameter
@@ -51,5 +51,5 @@ parser.add_argument('--thm_module', default="thm")
 
 if __name__ == '__main__':
     args = parser.parse_args()
-    save_name = "/mnt/cache/zhoujingqiu/configs/exp_pclr_12hop_small_remove_relu_lr16_noshare"
+    save_name = "/mnt/cache/zhoujingqiu/configs/exp_pclr_12hop_small_remove_relu_lr1_noshare_xavier"
     np.save(save_name,args)
