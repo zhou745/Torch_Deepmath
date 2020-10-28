@@ -59,7 +59,7 @@ if __name__ == '__main__':
     # args.load_name="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_0hop_small_remove_relu_lr1_noshare_xavier_dropneck/model_epoch30"
     # args.load_name="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_2hop_small_remove_relu_lr1_noshare_xavier/model_epoch110"
     # args.load_name="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_12hop_small_remove_relu_lr1_noshare_xavier/model_epoch30"
-    args.load_name="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_0hop_small_remove_relu_lr1_noshare_xavier_resneck/model_epoch60"
+    args.load_name="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_0hop_small_remove_relu_lr1_noshare_xavier_resneck/model_epoch70"
     # args.load_name="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_16hop_small_remove_relu_lr8_no_drop/model_epoch15"
     # args.load_name="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_2hop_small_remove_relu_lr4/model_epoch180"
     # args.load_name="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_2hop_small_remove_relu_lr8_auc100/model_epoch10"
@@ -83,4 +83,6 @@ if __name__ == '__main__':
         raise RuntimeError('unknown model')
 
     td.Train.Train_GNN.ValLoop(dataset,model,args)
+
+    #print("sss")
     
