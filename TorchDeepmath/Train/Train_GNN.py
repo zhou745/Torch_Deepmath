@@ -210,9 +210,9 @@ def ValLoop(dataset,model,args):
         if score_top1==0 and gt in tac_topk:
             N_true_sample+=1
         N_all+=1
-    print("tac acuracy is %f"%(N_true_tac/N_all))
-    print("score acuracy is %f"%(N_true_sco/N_all))
-    print("sample acuracy is %f"%(N_true_sample/N_all))
+    print("tac acuracy is %f"%(N_true_tac/N_all),flush=True)
+    print("score acuracy is %f"%(N_true_sco/N_all),flush=True)
+    print("sample acuracy is %f"%(N_true_sample/N_all),flush=True)
 
 
 
