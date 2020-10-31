@@ -51,7 +51,7 @@ if __name__ == '__main__':
             td.Train.Train_GNN.ValLoop(dataset,model,args)
 
             idx+=step
-            current_file = file_name+str(idx)
+            current_file = file_name+str(idx)+"_master_copy"
         else:
             time.sleep(60)
 

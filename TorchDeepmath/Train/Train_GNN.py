@@ -49,7 +49,10 @@ def model_parallel(rank,pid,dist_url,dataset,model,args):
                 new_state_dict[k] = v
         model_new.load_state_dict(new_state_dict)
         print("ckpt loaded!",flush=True)
-    drop_last=args.gnn_usebn or args.neck_usebn or args.tac_usebn or args.thm_usebn
+    if hasattr(args,"gnn_usebn"):
+        drop_last=args.gnn_usebn or args.neck_usebn or args.tac_usebn or args.thm_usebn
+    else:
+        drop_last=False
 
     model_new = DDP(model_new,device_ids=[gpu])
     sampler = torch.utils.data.distributed.DistributedSampler(dataset,shuffle=True, seed=123456)
