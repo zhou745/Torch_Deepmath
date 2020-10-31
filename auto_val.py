@@ -17,19 +17,24 @@ if __name__ == '__main__':
     assert path_arg.gpu is not None
     os.environ['CUDA_VISIBLE_DEVICES']=path_arg.gpu
     args = np.load(path_arg.load_path,allow_pickle=True).tolist()
+    
 
     # load_path = "/mnt/cache/zhoujingqiu/configs/exp_pclr_12hop_small_remove_relu_lr1_noshare_xavier.npy"
 
     random.seed(0)
     torch.manual_seed(0)
     model_size =0
-    args.path_goal = "/mnt/cache/zhoujingqiu/data/data_goal_valid_small.npy"
+
+    args.batch_size = 16
+    args.path_goal = "/mnt/cache/zhoujingqiu/data/data_goal_valid_small_fang.npy"
+    args.path_thm = "/mnt/cache/zhoujingqiu/data/data_thm_lr_fang.npy"
+    # args.path_goal = "/mnt/cache/zhoujingqiu/data/data_goal_valid_small.npy"
     _,dir_name = os.path.split(path_arg.load_path)
     dir_name = dir_name.replace(".npy","")
     file_name = "/mnt/cache/share_data/zhoujq/ckpt/"+dir_name+"/model_epoch"
 
-    idx = 10
-    step = 10
+    idx = 0
+    step = 5
     current_file = file_name+str(idx)
     while True:
 

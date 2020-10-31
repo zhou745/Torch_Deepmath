@@ -49,16 +49,19 @@ def model_parallel(rank,pid,dist_url,dataset,model,args):
                 new_state_dict[k] = v
         model_new.load_state_dict(new_state_dict)
         print("ckpt loaded!",flush=True)
+    drop_last=args.gnn_usebn or args.neck_usebn or args.tac_usebn or args.thm_usebn
 
     model_new = DDP(model_new,device_ids=[gpu])
     sampler = torch.utils.data.distributed.DistributedSampler(dataset,shuffle=True, seed=123456)
     data_loader = torch.utils.data.DataLoader(dataset,batch_size=args.batch_size//args.world_size,
                                                             collate_fn=Batch_collect,
                                                             sampler=sampler,
-                                                            num_workers=args.num_worker)
-    print("loader build finished",flush=True) 
+                                                            num_workers=args.num_worker,
+                                                            drop_last=drop_last)
+    print("loader build finished",flush=True)
+    moving_mean = args.moving_mean if hasattr(args,"moving_mean") else 0.0001
     # swa_model = AveragedModel(model_new,avg_fn = lambda ap, mp, nv:0.01*mp+0.99*ap)
-    swa_model = AveragedModel(model_new,avg_fn = lambda ap, mp, nv:0.0001*mp+0.9999*ap)
+    swa_model = AveragedModel(model_new,avg_fn = lambda ap, mp, nv:moving_mean*mp+(1.-moving_mean)*ap)
     # swa_model = AveragedModel(model_new,avg_fn = lambda ap, mp, nv:0.05*mp+0.95*ap)
 
     if rank==0:
@@ -153,9 +156,12 @@ def TrainLoop(dataset,model,args):
     train_multi_gpu(dataset,model,pid,dist_url,args)
 
 def ValLoop(dataset,model,args):
-    data_loader = torch.utils.data.DataLoader(dataset,batch_size=1,
+    batch_size = args.batch_size
+    thm_per_goal = args.neg_per_pos+1
+    data_loader = torch.utils.data.DataLoader(dataset,batch_size=batch_size,
                                                         collate_fn=Batch_collect,
-                                                        num_workers=4)
+                                                        num_workers=4,
+                                                        drop_last=True)
 
     state_dict = torch.load(args.load_name,map_location=torch.device('cpu'))
     new_state_dict = OrderedDict()
@@ -191,25 +197,22 @@ def ValLoop(dataset,model,args):
         result = model(item)
 
         tactic = result['tactic_scores']
-        score = result['logits'].view(-1)
-        # print(torch.sigmoid(score),flush=True)
+        score = result['logits'].view(batch_size,-1)
+        for idx in range(batch_size):
+            gt = item['tac_id'][idx].item()
+            tac_sco,tac_topk = torch.topk(tactic[idx],5)
 
-
-        gt = item['tac_id'].item()
-        tac_sco,tac_topk = torch.topk(tactic,5)
-        #print(tac_sco,flush=True)
-        # print(tac_topk,flush=True)
-        _,score_top1 = torch.topk(score,1)
+            _,score_top1 = torch.topk(score[idx],1)
         
-        if gt in tac_topk:
-            N_true_tac+=1
+            if gt in tac_topk:
+                N_true_tac+=1
 
-        if score_top1==0:
-            N_true_sco+=1
+            if score_top1==idx*thm_per_goal:
+                N_true_sco+=1
 
-        if score_top1==0 and gt in tac_topk:
-            N_true_sample+=1
-        N_all+=1
+            if score_top1==idx*thm_per_goal and gt in tac_topk:
+                N_true_sample+=1
+            N_all+=1
     print("tac acuracy is %f"%(N_true_tac/N_all),flush=True)
     print("score acuracy is %f"%(N_true_sco/N_all),flush=True)
     print("sample acuracy is %f"%(N_true_sample/N_all),flush=True)

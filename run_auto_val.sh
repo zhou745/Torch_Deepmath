@@ -1,2 +1,2 @@
-srun --partition=vc_research_2 --gres=gpu:0 -w SH-IDC1-10-198-8-125  --job-name=GNN --kill-on-bad-exit=1 python auto_val.py \
-   --load_path /mnt/cache/zhoujingqiu/configs/exp_pclr_bow_fc2048_fc1024_lr1_xavier.npy --gpu 4
+srun --partition=vc_research_2 --gres=gpu:0 -w SH-IDC1-10-198-8-128  --job-name=GNN --kill-on-bad-exit=1 python auto_val.py \
+   --load_path /mnt/cache/zhoujingqiu/configs/exp_pclr_12hop_lr1_uni_embed_torch_nobn_4gpu_mvmean0002.npy --gpu 4
