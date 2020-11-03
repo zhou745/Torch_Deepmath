@@ -19,8 +19,8 @@ parser.add_argument('--lr_decay', type=float,default=0.98)
 # parser.add_argument('--num_worker', type=int,default=4)
 parser.add_argument('--num_worker', type=int,default=0)
 #ckpt parameter
-parser.add_argument('--save_name', default="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_0hop_lr1_uni_embed_torch_usebn_8gpu_mvmean0002/model_epoch")
-# parser.add_argument('--save_name', default="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_bow_lr1_uni_embed_uni_nobn_4gpu_mvmean0002_neck_fc/model_epoch")
+parser.add_argument('--save_name', default="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_12hop_lr1_uni_embed_xavier_nobn_8gpu_mvmean0001_noshare/model_epoch")
+# parser.add_argument('--save_name', default="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_bow_lr1_uni_embed_uni_nobn_4gpu_mvmean0002/model_epoch")
 parser.add_argument('--load_name', default=None)
 parser.add_argument('--save_frequency', type=int,default=5)
 #model parameter
@@ -30,7 +30,7 @@ parser.add_argument('--goal_voc_embedsize', type=int,default=128)
 parser.add_argument('--thm_voc_length', type=int,default=1193)
 parser.add_argument('--thm_voc_embedsize', type=int,default=128)
 # parser.add_argument('--thm_voc_embedsize', type=int,default=1024)
-parser.add_argument('--num_hops', type=int,default=0)
+parser.add_argument('--num_hops', type=int,default=12)
 parser.add_argument('--score_weight', type=float,default=0.2)
 parser.add_argument('--tactic_weight', type=float,default=1.0)
 parser.add_argument('--auc_weight', type=float,default=4.0)
@@ -44,6 +44,7 @@ parser.add_argument('--tac_layer_size', type=list,default=[512,256,41])
 parser.add_argument('--thm_layer_size', type=int,default=[1024,512,1])
 # parser.add_argument('--gnn_module', default="GNN")
 parser.add_argument('--gnn_module', default="GNN_noshare")
+# parser.add_argument('--gnn_module', default="GNN_res")
 # parser.add_argument('--gnn_module', default="GNN_resnet")
 # parser.add_argument('--gnn_module', default="GNN_NODROP")
 parser.add_argument('--neck_module', default="neck_exp")
@@ -54,13 +55,15 @@ parser.add_argument('--tac_module', default="tac")
 parser.add_argument('--thm_module', default="thm")
 
 # parser.add_argument('--gnn_usebn', default=True)
-parser.add_argument('--neck_usebn', default=True)
+# parser.add_argument('--neck_usebn', default=True)
 # parser.add_argument('--tac_usebn', default=True)
 # parser.add_argument('--thm_usebn', default=True)
 # parser.add_argument('--embed_init', default='uniform')
-parser.add_argument('--embed_init', default=None)
+parser.add_argument('--embed_init', default='xavier')
 parser.add_argument('--weight_init', default='uniform')
-parser.add_argument('--moving_mean', type=float,default=0.0002)
+parser.add_argument('--moving_mean', type=float,default=0.0001)
+parser.add_argument('--mask_token_rate', default=0.01)
+parser.add_argument('--mask_token', default=False)
 
 
 # parser.add_argument('--neck_layer_size', type=list,default=[512,4096])
@@ -68,12 +71,12 @@ parser.add_argument('--moving_mean', type=float,default=0.0002)
 # parser.add_argument('--thm_layer_size', type=int,default=[2048,256,1])
 
 parser.add_argument('--gnn_usebn', default=False)
-# parser.add_argument('--neck_usebn', default=False)
+parser.add_argument('--neck_usebn', default=False)
 parser.add_argument('--tac_usebn', default=False)
 parser.add_argument('--thm_usebn', default=False)
 
 if __name__ == '__main__':
     args = parser.parse_args()
-    save_name = "/mnt/cache/zhoujingqiu/configs/exp_pclr_0hop_lr1_uni_embed_torch_usebn_8gpu_mvmean0002"
-    # save_name = "/mnt/cache/zhoujingqiu/configs/exp_pclr_12hop_lr1_uni_embed_torch_nobn_4gpu_mvmean0002"
+    save_name = "/mnt/cache/zhoujingqiu/configs/exp_pclr_12hop_lr1_uni_embed_xavier_nobn_8gpu_mvmean0001_noshare"
+    # save_name = "/mnt/cache/zhoujingqiu/configs/exp_pclr_bow_lr1_uni_embed_uni_nobn_4gpu_mvmean0002"
     np.save(save_name,args)

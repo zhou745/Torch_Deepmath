@@ -919,6 +919,9 @@ class GNN_net(nn.Module):
         self.tac_usebn = args.tac_usebn if hasattr(args, 'tac_usebn') else False
         self.thm_usebn = args.thm_usebn if hasattr(args, 'thm_usebn') else False
 
+        self.mask_token_rate = args.mask_token_rate if hasattr(args,'mask_token_rate') else 0.
+        self.mask_token = args.mask_token if hasattr(args,'mask_token') else False
+
 
         if hasattr(args, 'gnn_module'):
             if args.gnn_module == "GNN":
@@ -1047,6 +1050,22 @@ class GNN_net(nn.Module):
         return(tactic_loss,score_loss,auc_loss,reg_loss)
     
     def forward(self,input):
+        if self.mask_token:
+            # print("mask used",flush=True)
+            mask = np.random.uniform(0.,1)<0.5
+            if mask:
+                device = input['goal_token'].device
+                goal_num = input['goal_token'].shape[0]
+                thm_num = input['thm_token'].shape[0]
+
+                idx_goal = int(goal_num*self.mask_token_rate)
+                idx_thm = int(thm_num*self.mask_token_rate)
+                mask_id_goal = torch.randperm(goal_num,device=device)[:idx_goal]
+                mask_id_thm = torch.randperm(thm_num,device=device)[:idx_thm]
+
+                input['goal_token'][mask_id_goal]=1
+                input['thm_token'][mask_id_thm]=1
+
         batch_goal_token = self.goal_embed(input['goal_token'])
         batch_thm_token = self.thm_embed(input['thm_token'])
 

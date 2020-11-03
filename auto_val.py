@@ -28,6 +28,8 @@ if __name__ == '__main__':
     args.batch_size = 16
     args.path_goal = "/mnt/cache/zhoujingqiu/data/data_goal_valid_small_fang.npy"
     args.path_thm = "/mnt/cache/zhoujingqiu/data/data_thm_lr_fang.npy"
+    if hasattr(args,'mask_token'):
+        args.mask_token=False
     # args.path_goal = "/mnt/cache/zhoujingqiu/data/data_goal_valid_small.npy"
     _,dir_name = os.path.split(path_arg.load_path)
     dir_name = dir_name.replace(".npy","")
@@ -51,7 +53,8 @@ if __name__ == '__main__':
             td.Train.Train_GNN.ValLoop(dataset,model,args)
 
             idx+=step
-            current_file = file_name+str(idx)+"_master_copy"
+            current_file = file_name+str(idx)
+            #current_file = file_name+str(idx)+"_master_copy"
         else:
             time.sleep(60)
 
