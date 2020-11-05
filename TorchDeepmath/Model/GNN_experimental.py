@@ -77,65 +77,8 @@ class Tokenstore(nn.Module):
             if self.end_index == None:
                 self.end_index=torch.tensor(self.voc_length+1,dtype=torch.int64).to(device)
             end_token = self.tokenvectors(self.end_index)
-        return(end_token)
+        return(end_token) 
 
-class GNN_resnet(nn.Module):
-    def __init__(self,num_hops,embed_size,layer_size=[256,128],use_bn=True,init_methd = None):
-        super(GNN_resnet,self).__init__()
-
-        self.num_hops = num_hops
-        self.embed_size = embed_size
-        self.use_bn = use_bn
-        self.init_methd=init_methd
-
-        if self.num_hops>0:
-            self.MLP_V = MLP(self.embed_size,layer_size,self.use_bn,self.init_methd)
-        if self.num_hops>1:
-            self.MLP_E = MLP(1,layer_size,self.use_bn,self.init_methd)
-            
-            self.MLP_p_list = nn.ModuleList([MLP(3*self.embed_size,layer_size,self.use_bn,self.init_methd) for i in range(self.num_hops-1)])
-            self.MLP_c_list = nn.ModuleList([MLP(3*self.embed_size,layer_size,self.use_bn,self.init_methd) for i in range(self.num_hops-1)])
-            self.MLP_aggr = MLP_agg(3*self.embed_size,layer_size,self.use_bn,self.init_methd)
-
-    def forward(self,batch_token,edge_p_node,edge_c_node,edge_p_indicate,edge_c_indicate,
-                     p_mask,c_mask,start_token,end_token):
-        # print(batch_token,flush=True)
-
-        Num_node = batch_token.shape[0]
-        if self.num_hops>0:
-            hidden_state = batch_token+self.MLP_V(batch_token)
-        else:
-            hidden_state = batch_token
-       
-        #compute the edge initial embed
-        if self.num_hops>1:
-            edge_p = self.MLP_E(edge_p_indicate.view(-1,1))
-            edge_c = self.MLP_E(edge_c_indicate.view(-1,1))
-
-        #main gnn loops
-        for hop in range(self.num_hops-1):
-            #gather node
-            edge_p_node_batch = hidden_state[edge_p_node,:]
-            edge_c_node_batch = hidden_state[edge_c_node,:]
-
-            #concat the input
-            edge_p_input = torch.cat([edge_c_node_batch,edge_p_node_batch, edge_p],-1)
-            edge_c_input = torch.cat([edge_p_node_batch,edge_c_node_batch, edge_c],-1)
-            
-            S_p = self.MLP_p_list[hop](edge_p_input)
-            S_c = self.MLP_c_list[hop](edge_c_input)
-
-            S_p = torch_scatter.scatter_mean(S_p,edge_p_node,dim=0,dim_size=Num_node)
-            S_c = torch_scatter.scatter_mean(S_c,edge_c_node,dim=0,dim_size=Num_node)
-
-            S_p=S_p + p_mask.view(-1,1)*start_token
-            S_c=S_c + c_mask.view(-1,1)*end_token
-
-            x_aggr = torch.cat([hidden_state,S_p,S_c],-1)
-            hidden_state = hidden_state+self.MLP_aggr(x_aggr)
-            hidden_state = F.relu(hidden_state)
-
-        return(hidden_state)
 
 class GNN_noshare(nn.Module):
     def __init__(self,num_hops,embed_size,layer_size=[256,128],use_bn=True,init_methd=None):
@@ -182,63 +125,6 @@ class GNN_noshare(nn.Module):
             
             S_p = self.MLP_p_list[hop](edge_p_input)
             S_c = self.MLP_c_list[hop](edge_c_input)
-
-            S_p = torch_scatter.scatter_mean(S_p,edge_p_node,dim=0,dim_size=Num_node)
-            S_c = torch_scatter.scatter_mean(S_c,edge_c_node,dim=0,dim_size=Num_node)
-
-            S_p=S_p + p_mask.view(-1,1)*start_token
-            S_c=S_c + c_mask.view(-1,1)*end_token
-
-            x_aggr = torch.cat([hidden_state,S_p,S_c],-1)
-            hidden_state = hidden_state+self.MLP_aggr(x_aggr)
-            hidden_state = F.relu(hidden_state)
-
-        return(hidden_state)
-
-class GNN_NODROP(nn.Module):
-    def __init__(self,num_hops,embed_size,layer_size=[256,128],use_bn=True,init_methd=None):
-        super(GNN_NODROP,self).__init__()
-
-        self.num_hops = num_hops
-        self.embed_size = embed_size
-        self.use_bn = use_bn
-        self.init_methd=init_methd
-
-        if self.num_hops>0:
-            self.MLP_V = MLP_NODROP(self.embed_size,layer_size,self.use_bn,self.init_methd)
-        if self.num_hops>1:
-            self.MLP_E = MLP_NODROP(1,layer_size,self.use_bn,self.init_methd)
-            self.MLP_p = MLP_NODROP(3*self.embed_size,layer_size,self.use_bn,self.init_methd)
-            self.MLP_c = MLP_NODROP(3*self.embed_size,layer_size,self.use_bn,self.init_methd)
-            self.MLP_aggr = MLP_NODROP(3*self.embed_size,layer_size,self.use_bn,self.init_methd)
-    
-    def forward(self,batch_token,edge_p_node,edge_c_node,edge_p_indicate,edge_c_indicate,
-                     p_mask,c_mask,start_token,end_token):
-        # print(batch_token,flush=True)
-
-        Num_node = batch_token.shape[0]
-        if self.num_hops>0:
-            hidden_state = batch_token+self.MLP_V(batch_token)
-        else:
-            hidden_state = batch_token
-       
-        #compute the edge initial embed
-        if self.num_hops>1:
-            edge_p = self.MLP_E(edge_p_indicate.view(-1,1))
-            edge_c = self.MLP_E(edge_c_indicate.view(-1,1))
-
-        #main gnn loops
-        for hop in range(self.num_hops-1):
-            #gather node
-            edge_p_node_batch = hidden_state[edge_p_node,:]
-            edge_c_node_batch = hidden_state[edge_c_node,:]
-
-            #concat the input
-            edge_p_input = torch.cat([edge_c_node_batch,edge_p_node_batch, edge_p],-1)
-            edge_c_input = torch.cat([edge_p_node_batch,edge_c_node_batch, edge_c],-1)
-            
-            S_p = self.MLP_p(edge_p_input)
-            S_c = self.MLP_c(edge_c_input)
 
             S_p = torch_scatter.scatter_mean(S_p,edge_p_node,dim=0,dim_size=Num_node)
             S_c = torch_scatter.scatter_mean(S_c,edge_c_node,dim=0,dim_size=Num_node)
@@ -309,98 +195,6 @@ class GNN_res(nn.Module):
 
         return(hidden_state)
 
-class MLP_NODROP(nn.Module):
-    def __init__(self,input_size,layer_size=[256,128],use_bn=True,init_methd=None):
-        super(MLP_NODROP,self).__init__()
-
-        self.use_bn = use_bn
-        self.init_methd = init_methd
-
-        if self.use_bn:
-            self.model = nn.Sequential(
-                nn.Linear(input_size,layer_size[0]),
-                nn.BatchNorm1d(layer_size[0]),
-                nn.ReLU(),
-                nn.Linear(layer_size[0],layer_size[1]),
-                nn.BatchNorm1d(layer_size[1]),
-                nn.ReLU()
-            )
-        else:
-            self.model = nn.Sequential(
-                nn.Linear(input_size,layer_size[0]),
-                nn.ReLU(),
-                nn.Linear(layer_size[0],layer_size[1]),
-                nn.ReLU()
-            )
-
-        
-        for m in self.model:
-            if isinstance(m,nn.BatchNorm1d):
-                init.constant_(m.weight, 1)
-                init.constant_(m.bias, 0)
-                print("BN layer in mlp",flush=True)
-            elif isinstance(m,nn.Linear):
-                init.zeros_(m.bias)
-                if self.init_methd==None or self.init_methd=="uniform":
-                    init.uniform_(m.weight, a=init_a, b=init_b)
-                elif self.init_methd=="xavier":
-                    init.xavier_normal_(m.weight)
-                else:
-                    raise RuntimeError("unknow init type")
-            elif isinstance(m,nn.ReLU) or isinstance(m,nn.Dropout):
-                pass
-            else:
-                raise RuntimeError("unknow parameter type")
-        
-    
-    def forward(self,input):
-        return(self.model(input))
-
-class MLP_agg(nn.Module):
-    def __init__(self,input_size,layer_size=[256,128],use_bn=True,init_methd=None):
-        super(MLP_agg,self).__init__()
-        self.use_bn = use_bn
-        self.init_methd=init_methd
-
-        if self.use_bn:
-            self.model = nn.Sequential(
-                nn.Linear(input_size,layer_size[0]),
-                nn.BatchNorm1d(layer_size[0]),
-                nn.ReLU(),
-                nn.Linear(layer_size[0],layer_size[1]),
-                nn.BatchNorm1d(layer_size[1]),
-                nn.Dropout(p=p1)
-            )
-        else:
-            self.model = nn.Sequential(
-                nn.Linear(input_size,layer_size[0]),
-                nn.ReLU(),
-                nn.Linear(layer_size[0],layer_size[1]),
-                nn.Dropout(p=p1)
-            )
-        
-        for m in self.model:
-            if isinstance(m,nn.BatchNorm1d):
-                init.constant_(m.weight, 1)
-                init.constant_(m.bias, 0)
-                print("BN layer in mlp",flush=True)
-            elif isinstance(m,nn.Linear):
-                init.zeros_(m.bias)
-                if self.init_methd==None or self.init_methd=="uniform":
-                    init.uniform_(m.weight, a=init_a, b=init_b)
-                elif self.init_methd=="xavier":
-                    init.xavier_normal_(m.weight)
-                else:
-                    raise RuntimeError("unknow init type")
-            elif isinstance(m,nn.ReLU) or isinstance(m,nn.Dropout):
-                pass
-            else:
-                raise RuntimeError("unknow parameter type")
-        
-    
-    def forward(self,input):
-        return(self.model(input))
-
 class MLP(nn.Module):
     def __init__(self,input_size,layer_size=[256,128],use_bn=True,init_methd=None):
         super(MLP,self).__init__()
@@ -410,10 +204,10 @@ class MLP(nn.Module):
         if self.use_bn:
             self.model = nn.Sequential(
                 nn.Linear(input_size,layer_size[0]),
-                nn.BatchNorm1d(layer_size[0]),
+                nn.LayerNorm(layer_size[0]),
                 nn.ReLU(),
                 nn.Linear(layer_size[0],layer_size[1]),
-                nn.BatchNorm1d(layer_size[1]),
+                nn.LayerNorm(layer_size[1]),
                 nn.ReLU(),
                 nn.Dropout(p=p1)
             )
@@ -427,10 +221,10 @@ class MLP(nn.Module):
             )
         
         for m in self.model:
-            if isinstance(m,nn.BatchNorm1d):
+            if isinstance(m,nn.LayerNorm):
                 init.constant_(m.weight, 1)
                 init.constant_(m.bias, 0)
-                print("BN layer in mlp",flush=True)
+                print("Normalize layer in mlp",flush=True)
             elif isinstance(m,nn.Linear):
                 init.zeros_(m.bias)
                 if self.init_methd==None or self.init_methd=="uniform":
@@ -505,118 +299,6 @@ class GNN(nn.Module):
 
         return(hidden_state)
 
-class Neck_drop(nn.Module):
-    def __init__(self,embed_size,filters=[512,1024],use_bn=True,init_methd=None):
-        super(Neck_drop,self).__init__()
-
-        self.embed_size = embed_size
-        self.filters=filters
-        
-        self.use_bn=use_bn
-        self.init_methd=init_methd
-        if self.use_bn:
-            self.model = nn.Sequential(
-                nn.Linear(self.embed_size,self.filters[0]),
-                nn.BatchNorm1d(self.filters[0]),
-                nn.ReLU(),
-                nn.Dropout(p=p1),
-                nn.Linear(self.filters[0],self.filters[1]),
-                nn.BatchNorm1d(self.filters[1])
-            )
-        else:
-            self.model = nn.Sequential(
-                nn.Linear(self.embed_size,self.filters[0]),
-                nn.ReLU(),
-                nn.Dropout(p=p1),
-                nn.Linear(self.filters[0],self.filters[1])
-            )
-
-        for m in self.model:
-            if isinstance(m,nn.BatchNorm1d):
-                init.constant_(m.weight, 1)
-                init.constant_(m.bias, 0)
-                print("BN layer in neck",flush=True)
-            elif isinstance(m,nn.Linear):
-                init.zeros_(m.bias)
-                if self.init_methd==None or self.init_methd=="uniform":
-                    init.uniform_(m.weight, a=init_a, b=init_b)
-                elif self.init_methd=="xavier":
-                    init.xavier_normal_(m.weight)
-                else:
-                    raise RuntimeError("unknow init type")
-            elif isinstance(m,nn.ReLU) or isinstance(m,nn.Dropout):
-                pass
-            else:
-                raise RuntimeError("unknow parameter type")
-
-    def forward(self,batch_gnn_embed,gather_idx,num_graph):
-        # print(batch_gnn_embed,flush=True)
-        batch_neck_allnode = self.model(batch_gnn_embed)
-
-        batch_neck_graph,idx_ = torch_scatter.scatter_max(batch_neck_allnode,gather_idx,dim=0,dim_size=num_graph)
-        return(batch_neck_graph)
-
-class Neck_res(nn.Module):
-    def __init__(self,embed_size,filters=[512,1024],use_bn=True,init_methd=None):
-        super(Neck_res,self).__init__()
-
-        self.embed_size = embed_size
-        self.filters=filters
-
-        self.use_bn = use_bn
-        self.init_methd=init_methd
-        
-        if self.embed_size!=self.filters[1]:
-            self.fc = nn.Linear(self.embed_size,self.filters[1])
-            self.match_dim = True
-        else:
-            self.match_dim = False
-
-        if self.use_bn:
-            self.model = nn.Sequential(
-                nn.Linear(self.embed_size,self.filters[0]),
-                nn.BatchNorm1d(self.filters[0]),
-                nn.ReLU(),
-                nn.Linear(self.filters[0],self.filters[1]),
-                nn.BatchNorm1d(self.filters[1])
-            )
-        else:
-            self.model = nn.Sequential(
-                nn.Linear(self.embed_size,self.filters[0]),
-                nn.ReLU(),
-                nn.Linear(self.filters[0],self.filters[1])
-            )
-
-        for m in self.model:
-            if isinstance(m,nn.BatchNorm1d):
-                init.constant_(m.weight, 1)
-                init.constant_(m.bias, 0)
-                print("BN layer in neck",flush=True)
-            elif isinstance(m,nn.Linear):
-                init.zeros_(m.bias)
-                if self.init_methd==None or self.init_methd=="uniform":
-                    init.uniform_(m.weight, a=init_a, b=init_b)
-                elif self.init_methd=="xavier":
-                    init.xavier_normal_(m.weight)
-                else:
-                    raise RuntimeError("unknow init type")
-            elif isinstance(m,nn.ReLU) or isinstance(m,nn.Dropout):
-                pass
-            else:
-                raise RuntimeError("unknow parameter type")
-
-    def forward(self,batch_gnn_embed,gather_idx,num_graph):
-        # print(batch_gnn_embed,flush=True)
-        batch_neck_allnode = self.model(batch_gnn_embed)
-        if self.match_dim:
-            batch_neck_allnode_matched = self.fc(batch_gnn_embed)
-        else:
-            batch_neck_allnode_matched = batch_gnn_embed
-        batch_neck_allnode = batch_neck_allnode+batch_neck_allnode_matched
-        batch_neck_graph,idx_ = torch_scatter.scatter_max(batch_neck_allnode,gather_idx,dim=0,dim_size=num_graph)
-
-        return(batch_neck_graph)
-
 class Neck_exp(nn.Module):
     def __init__(self,embed_size,filters=[512,1024],use_bn=True,init_methd=None):
         super(Neck_exp,self).__init__()
@@ -629,10 +311,10 @@ class Neck_exp(nn.Module):
         if self.use_bn:
             self.model = nn.Sequential(
                 nn.Linear(self.embed_size,self.filters[0]),
-                nn.BatchNorm1d(self.filters[0]),
+                nn.LayerNorm(self.filters[0]),
                 nn.ReLU(),
                 nn.Linear(self.filters[0],self.filters[1]),
-                nn.BatchNorm1d(self.filters[1])
+                nn.LayerNorm(self.filters[1])
             )
         else:
             self.model = nn.Sequential(
@@ -642,7 +324,7 @@ class Neck_exp(nn.Module):
             )
         
         for m in self.model:
-            if isinstance(m,nn.BatchNorm1d):
+            if isinstance(m,nn.LayerNorm):
                 init.constant_(m.weight, 1)
                 init.constant_(m.bias, 0)
                 print("BN layer in neck",flush=True)
@@ -677,51 +359,6 @@ class Neck_bow(nn.Module):
 
         return(batch_neck_graph)
 
-class Neck_light(nn.Module):
-    def __init__(self,embed_size,filters=[512,1024],use_bn = True,init_methd=None):
-        super(Neck_light,self).__init__()
-
-        self.embed_size = embed_size
-        self.filters=filters
-        self.use_bn = use_bn
-        self.init_methd=init_methd
-        
-        if self.use_bn:
-            self.model = nn.Sequential(
-                nn.Linear(self.embed_size,self.filters[-1]),
-                nn.BatchNorm1d(self.filters[-1]),
-                nn.ReLU()
-            )
-        else:
-            self.model = nn.Sequential(
-                nn.Linear(self.embed_size,self.filters[-1]),
-                nn.ReLU(),
-            )
-
-        for m in self.model:
-            if isinstance(m,nn.BatchNorm1d):
-                init.constant_(m.weight, 1)
-                init.constant_(m.bias, 0)
-                print("BN layer in neck",flush=True)
-            elif isinstance(m,nn.Linear):
-                init.zeros_(m.bias)
-                if self.init_methd==None or self.init_methd=="uniform":
-                    init.uniform_(m.weight, a=init_a, b=init_b)
-                elif self.init_methd=="xavier":
-                    init.xavier_normal_(m.weight)
-                else:
-                    raise RuntimeError("unknow init type")
-            elif isinstance(m,nn.ReLU) or isinstance(m,nn.Dropout):
-                pass
-            else:
-                raise RuntimeError("unknow parameter type")
-
-    def forward(self,batch_gnn_embed,gather_idx,num_graph):
-        # print(batch_gnn_embed,flush=True)
-        batch_neck_allnode = self.model(batch_gnn_embed)
-
-        batch_neck_graph,idx_ = torch_scatter.scatter_max(batch_neck_allnode,gather_idx,dim=0,dim_size=num_graph)
-        return(batch_neck_graph)
 
 class Neck(nn.Module):
     def __init__(self,embed_size,filters=[512,1024],use_bn = True,init_methd=None):
@@ -735,10 +372,10 @@ class Neck(nn.Module):
         if self.use_bn:
             self.model = nn.Sequential(
                 nn.Linear(self.embed_size,self.filters[0]),
-                nn.BatchNorm1d(self.filters[0]),
+                nn.LayerNorm(self.filters[0]),
                 nn.ReLU(),
                 nn.Linear(self.filters[0],self.filters[1]),
-                nn.BatchNorm1d(self.filters[1]),
+                nn.LayerNorm(self.filters[1]),
                 nn.ReLU()
             )
         else:
@@ -750,7 +387,7 @@ class Neck(nn.Module):
             )
 
         for m in self.model:
-            if isinstance(m,nn.BatchNorm1d):
+            if isinstance(m,nn.LayerNorm):
                 init.constant_(m.weight, 1)
                 init.constant_(m.bias, 0)
                 print("BN layer in neck",flush=True)
@@ -793,11 +430,11 @@ class Tactic_Classifier(nn.Module):
             self.model = nn.Sequential(
                 nn.Dropout(p=p2),
                 nn.Linear(self.input_size,self.hidden_layers[0]),
-                nn.BatchNorm1d(self.hidden_layers[0]),
+                nn.LayerNorm(self.hidden_layers[0]),
                 nn.ReLU(),
                 nn.Dropout(p=p2),
                 nn.Linear(self.hidden_layers[0],self.hidden_layers[1]),
-                nn.BatchNorm1d(self.hidden_layers[1]),
+                nn.LayerNorm(self.hidden_layers[1]),
                 nn.ReLU(),
                 nn.Dropout(p=p2),
                 nn.Linear(self.hidden_layers[1],self.hidden_layers[2])
@@ -815,7 +452,7 @@ class Tactic_Classifier(nn.Module):
             )
 
         for m in self.model:
-            if isinstance(m,nn.BatchNorm1d):
+            if isinstance(m,nn.LayerNorm):
                 init.constant_(m.weight, 1)
                 init.constant_(m.bias, 0)
                 print("BN layer in tac",flush=True)
@@ -850,11 +487,11 @@ class Theom_logit(nn.Module):
             self.model = nn.Sequential(
                 nn.Dropout(p=p2),
                 nn.Linear(self.embed_size*3,self.hidden_layers[0]),
-                nn.BatchNorm1d(self.hidden_layers[0]),
+                nn.LayerNorm(self.hidden_layers[0]),
                 nn.ReLU(),
                 nn.Dropout(p=p2),
                 nn.Linear(self.hidden_layers[0],self.hidden_layers[1]),
-                nn.BatchNorm1d(self.hidden_layers[1]),
+                nn.LayerNorm(self.hidden_layers[1]),
                 nn.ReLU(),
                 nn.Dropout(p=p2),
                 nn.Linear(self.hidden_layers[1],self.hidden_layers[2])
@@ -872,7 +509,7 @@ class Theom_logit(nn.Module):
             )
 
         for m in self.model:
-            if isinstance(m,nn.BatchNorm1d):
+            if isinstance(m,nn.LayerNorm):
                 init.constant_(m.weight, 1)
                 init.constant_(m.bias, 0)
                 print("BN layer in thm",flush=True)
@@ -928,18 +565,12 @@ class GNN_net(nn.Module):
             if args.gnn_module == "GNN":
                 self.GNN_goal = GNN(args.num_hops,args.goal_voc_embedsize,args.gnn_layer_size,self.gnn_usebn,self.weight_init)
                 self.GNN_thm = GNN(args.num_hops,args.thm_voc_embedsize,args.gnn_layer_size,self.gnn_usebn,self.weight_init)
-            elif args.gnn_module == "GNN_NODROP":
-                self.GNN_goal = GNN_NODROP(args.num_hops,args.goal_voc_embedsize,args.gnn_layer_size,self.gnn_usebn,self.weight_init)
-                self.GNN_thm = GNN_NODROP(args.num_hops,args.thm_voc_embedsize,args.gnn_layer_size,self.gnn_usebn,self.weight_init)
             elif args.gnn_module == "GNN_res":
                 self.GNN_goal = GNN_res(args.num_hops,args.goal_voc_embedsize,args.gnn_layer_size,self.gnn_usebn,self.weight_init)
                 self.GNN_thm = GNN_res(args.num_hops,args.thm_voc_embedsize,args.gnn_layer_size,self.gnn_usebn,self.weight_init)
             elif args.gnn_module == "GNN_noshare":
                 self.GNN_goal = GNN_noshare(args.num_hops,args.goal_voc_embedsize,args.gnn_layer_size,self.gnn_usebn,self.weight_init)
                 self.GNN_thm = GNN_noshare(args.num_hops,args.thm_voc_embedsize,args.gnn_layer_size,self.gnn_usebn,self.weight_init)
-            elif  args.gnn_module == "GNN_resnet":
-                self.GNN_goal = GNN_resnet(args.num_hops,args.goal_voc_embedsize,args.gnn_layer_size,self.gnn_usebn,self.weight_init)
-                self.GNN_thm = GNN_resnet(args.num_hops,args.thm_voc_embedsize,args.gnn_layer_size,self.gnn_usebn,self.weight_init)
             else:
                 raise RuntimeError('unknown gnn type')
         else:
@@ -952,19 +583,7 @@ class GNN_net(nn.Module):
                 self.neck_thm = Neck(args.gnn_layer_size[-1],args.neck_layer_size,self.neck_usebn,self.weight_init)
             elif args.neck_module == "neck_exp":
                 self.neck_goal = Neck_exp(args.gnn_layer_size[-1],args.neck_layer_size,self.neck_usebn,self.weight_init)
-                self.neck_thm = Neck_exp(args.gnn_layer_size[-1],args.neck_layer_size,self.neck_usebn,self.weight_init)
-            elif args.neck_module == "neck_drop":
-                self.neck_goal = Neck_drop(args.gnn_layer_size[-1],args.neck_layer_size,self.neck_usebn,self.weight_init)
-                self.neck_thm = Neck_drop(args.gnn_layer_size[-1],args.neck_layer_size,self.neck_usebn,self.weight_init)
-            elif args.neck_module == "neck_bow":
-                self.neck_goal = Neck_bow()
-                self.neck_thm = Neck_bow()
-            elif args.neck_module == "neck_res":
-                self.neck_goal = Neck_res(args.gnn_layer_size[-1],args.neck_layer_size,self.neck_usebn,self.weight_init)
-                self.neck_thm = Neck_res(args.gnn_layer_size[-1],args.neck_layer_size,self.neck_usebn,self.weight_init) 
-            elif args.neck_module == "neck_light":
-                self.neck_goal = Neck_light(args.gnn_layer_size[-1],args.neck_layer_size,self.neck_usebn,self.weight_init)
-                self.neck_thm = Neck_light(args.gnn_layer_size[-1],args.neck_layer_size,self.neck_usebn,self.weight_init)                    
+                self.neck_thm = Neck_exp(args.gnn_layer_size[-1],args.neck_layer_size,self.neck_usebn,self.weight_init)                   
             else:
                 raise RuntimeError('unknown neck type')
         else:

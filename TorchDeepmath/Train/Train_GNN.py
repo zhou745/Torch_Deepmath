@@ -219,6 +219,7 @@ def ValLoop(dataset,model,args):
     print("tac acuracy is %f"%(N_true_tac/N_all),flush=True)
     print("score acuracy is %f"%(N_true_sco/N_all),flush=True)
     print("sample acuracy is %f"%(N_true_sample/N_all),flush=True)
+    return((N_true_tac/N_all),(N_true_sco/N_all),(N_true_sample/N_all))
 
 
 
