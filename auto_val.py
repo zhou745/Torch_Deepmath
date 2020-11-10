@@ -43,25 +43,26 @@ if __name__ == '__main__':
     _,dir_name = os.path.split(path_arg.load_path)
     dir_name = dir_name.replace(".npy","")
     file_name = "/mnt/cache/share_data/zhoujq/ckpt/"+dir_name+"/model_epoch"
+    # file_name = "/mnt/lustre/share_data/fangrongyao/ckpt/exp_hop4_lr4_batch128_layernorm_gnnres_No1019/model_epoch"
 
-    idx = 0
+    idx = 150
     step = 5
+    # current_file = file_name+str(idx)
     current_file = file_name+str(idx)
 
     exp_name = "tmp"
     csv_folder = 'val_result/{:}.csv'.format(exp_name)
+    if model_type == 0:
+        model = td.Model.GNN.GNN_net(args)
+    elif model_type==1:
+        model = td.Model.GNN_experimental.GNN_net(args)
+    else:
+        raise RuntimeError('unknown model')
     while True:
         if os.path.isfile(current_file):
             args.load_name=current_file
             print(args,flush=True)
             dataset = td.Data.dataset.GNN_dataset(args)
-
-            if model_type == 0:
-                model = td.Model.GNN.GNN_net(args)
-            elif model_type==1:
-                model = td.Model.GNN_experimental.GNN_net(args)
-            else:
-                raise RuntimeError('unknown model')
 
             tac,thm,sample=td.Train.Train_GNN.ValLoop(dataset,model,args)
 
@@ -71,9 +72,9 @@ if __name__ == '__main__':
             df.to_csv(csv_folder)
 
             idx+=step
+            # current_file = file_name+str(idx)
             current_file = file_name+str(idx)
-            #current_file = file_name+str(idx)+"_master_copy"
         else:
-            time.sleep(60)
+            time.sleep(1)
 
     
