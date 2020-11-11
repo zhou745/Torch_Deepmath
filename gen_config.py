@@ -19,7 +19,7 @@ parser.add_argument('--lr_decay', type=float,default=0.98)
 # parser.add_argument('--num_worker', type=int,default=4)
 parser.add_argument('--num_worker', type=int,default=0)
 #ckpt parameter
-parser.add_argument('--save_name', default="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_12hop_lr1_uni_embed_pytorch_layernorm_8gpu_mvmean0001_noshare_v2/model_epoch")
+parser.add_argument('--save_name', default="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_4hop_lr1_uni_embed_pytorch_layernorm_8gpu_mvmean0001_noshare_v3/model_epoch")
 # parser.add_argument('--save_name', default="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_bow_lr1_uni_embed_uni_nobn_4gpu_mvmean0002/model_epoch")
 parser.add_argument('--load_name', default=None)
 # parser.add_argument('--load_name', default="/mnt/cache/share_data/zhoujq/ckpt/exp_pclr_12hop_lr1_uni_embed_pytorch_layernorm_8gpu_mvmean0001_noshare/model_epoch210")
@@ -44,7 +44,7 @@ parser.add_argument('--neck_layer_size', type=list,default=[512,1024])
 parser.add_argument('--tac_layer_size', type=list,default=[512,256,41])
 parser.add_argument('--thm_layer_size', type=int,default=[1024,512,1])
 # parser.add_argument('--gnn_module', default="GNN")
-parser.add_argument('--gnn_module', default="GNN_noshare_v2")
+parser.add_argument('--gnn_module', default="GNN_noshare_v3")
 # parser.add_argument('--gnn_module', default="GNN_noshare")
 # parser.add_argument('--gnn_module', default="GNN_res")
 # parser.add_argument('--gnn_module', default="GNN_resnet")
@@ -80,6 +80,6 @@ parser.add_argument('--mask_token', default=False)
 parser.add_argument('--model_type', type=int,default=1)
 if __name__ == '__main__':
     args = parser.parse_args()
-    save_name = "/mnt/cache/zhoujingqiu/configs/exp_pclr_12hop_lr1_uni_embed_pytorch_layernorm_8gpu_mvmean0001_noshare_v2"
+    save_name = "/mnt/cache/zhoujingqiu/configs/exp_pclr_4hop_lr1_uni_embed_pytorch_layernorm_8gpu_mvmean0001_noshare_v3"
     # save_name = "/mnt/cache/zhoujingqiu/configs/exp_pclr_bow_lr1_uni_embed_uni_nobn_4gpu_mvmean0002"
     np.save(save_name,args)

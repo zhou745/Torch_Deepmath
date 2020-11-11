@@ -33,8 +33,10 @@ if __name__ == '__main__':
     torch.manual_seed(0)
 
     args.batch_size = 16
-    args.path_goal = "/mnt/cache/zhoujingqiu/data/data_goal_valid_small_fang.npy"
+    args.path_goal = "/mnt/cache/zhoujingqiu/data/data_goal_valid.npy"
+    # args.path_goal = "/mnt/cache/zhoujingqiu/data/data_goal_valid_small_fang.npy"
     args.path_thm = "/mnt/cache/zhoujingqiu/data/data_thm_lr_fang.npy"
+    args.neg_per_pos = 15
     model_type = args.model_type if hasattr(args,"model_type") else 0
 
     if hasattr(args,'mask_token'):
@@ -43,9 +45,9 @@ if __name__ == '__main__':
     _,dir_name = os.path.split(path_arg.load_path)
     dir_name = dir_name.replace(".npy","")
     file_name = "/mnt/cache/share_data/zhoujq/ckpt/"+dir_name+"/model_epoch"
-    # file_name = "/mnt/lustre/share_data/fangrongyao/ckpt/exp_hop4_lr4_batch128_layernorm_gnnres_No1019/model_epoch"
+    # file_name = "/mnt/lustre/share_data/fangrongyao/ckpt/exp_bow_lr1_batch128_layernorm_No1020/model_epoch"
 
-    idx = 150
+    idx = 115
     step = 5
     # current_file = file_name+str(idx)
     current_file = file_name+str(idx)

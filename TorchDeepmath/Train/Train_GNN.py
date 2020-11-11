@@ -205,15 +205,15 @@ def ValLoop(dataset,model,args):
             gt = item['tac_id'][idx].item()
             tac_sco,tac_topk = torch.topk(tactic[idx],5)
 
-            _,score_top1 = torch.topk(score[idx],1)
+            _,score_topk = torch.topk(score[idx],1)
         
             if gt in tac_topk:
                 N_true_tac+=1
 
-            if score_top1==idx*thm_per_goal:
+            if idx*thm_per_goal in score_topk:
                 N_true_sco+=1
 
-            if score_top1==idx*thm_per_goal and gt in tac_topk:
+            if idx*thm_per_goal in score_topk and gt in tac_topk:
                 N_true_sample+=1
             N_all+=1
     print("tac acuracy is %f"%(N_true_tac/N_all),flush=True)

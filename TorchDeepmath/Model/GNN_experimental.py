@@ -79,6 +79,64 @@ class Tokenstore(nn.Module):
             end_token = self.tokenvectors(self.end_index)
         return(end_token) 
 
+class GNN_noshare_v3(nn.Module):
+    def __init__(self,num_hops,embed_size,layer_size=[256,128],use_bn=True,init_methd=None):
+        super(GNN_noshare_v3,self).__init__()
+
+        self.num_hops = num_hops
+        self.embed_size = embed_size
+        self.use_bn = use_bn
+        self.init_methd=init_methd
+
+        if self.num_hops>0:
+            self.MLP_V = MLP(self.embed_size,layer_size,self.use_bn,self.init_methd)
+        if self.num_hops>1:
+            self.MLP_E = MLP(1,layer_size,self.use_bn,self.init_methd)
+            
+            self.MLP_p_list = nn.ModuleList([MLP(3*self.embed_size,layer_size,self.use_bn,self.init_methd) for i in range(self.num_hops-1)])
+            self.MLP_c_list = nn.ModuleList([MLP(3*self.embed_size,layer_size,self.use_bn,self.init_methd) for i in range(self.num_hops-1)])
+            self.MLP_aggr_list = nn.ModuleList([MLP(3*self.embed_size,layer_size,self.use_bn,self.init_methd) for i in range(self.num_hops-1)])
+
+    def forward(self,batch_token,edge_p_node,edge_c_node,edge_p_indicate,edge_c_indicate,
+                     p_mask,c_mask,start_token,end_token):
+        # print(batch_token,flush=True)
+
+        Num_node = batch_token.shape[0]
+        if self.num_hops>0:
+            hidden_state = self.MLP_V(batch_token)
+        else:
+            hidden_state = batch_token
+       
+        #compute the edge initial embed
+        if self.num_hops>1:
+            edge_p = self.MLP_E(edge_p_indicate.view(-1,1))
+            edge_c = self.MLP_E(edge_c_indicate.view(-1,1))
+
+        #main gnn loops
+        for hop in range(self.num_hops-1):
+            #gather node
+            edge_p_node_batch = hidden_state[edge_p_node,:]
+            edge_c_node_batch = hidden_state[edge_c_node,:]
+
+            #concat the input
+            edge_p_input = torch.cat([edge_c_node_batch,edge_p_node_batch, edge_p],-1)
+            edge_c_input = torch.cat([edge_p_node_batch,edge_c_node_batch, edge_c],-1)
+            
+            S_p = self.MLP_p_list[hop](edge_p_input)
+            S_c = self.MLP_c_list[hop](edge_c_input)
+
+            S_p = torch_scatter.scatter_mean(S_p,edge_p_node,dim=0,dim_size=Num_node)
+            S_c = torch_scatter.scatter_mean(S_c,edge_c_node,dim=0,dim_size=Num_node)
+
+            S_p=S_p + p_mask.view(-1,1)*start_token
+            S_c=S_c + c_mask.view(-1,1)*end_token
+
+            x_aggr = torch.cat([hidden_state,S_p,S_c],-1)
+            hidden_state = hidden_state+self.MLP_aggr_list[hop](x_aggr)
+            hidden_state = F.relu(hidden_state)
+
+        return(hidden_state)
+
 class GNN_noshare_v2(nn.Module):
     def __init__(self,num_hops,embed_size,layer_size=[256,128],use_bn=True,init_methd=None):
         super(GNN_noshare_v2,self).__init__()
@@ -631,6 +689,9 @@ class GNN_net(nn.Module):
             elif args.gnn_module == "GNN_noshare_v2":
                 self.GNN_goal = GNN_noshare_v2(args.num_hops,args.goal_voc_embedsize,args.gnn_layer_size,self.gnn_usebn,self.weight_init)
                 self.GNN_thm = GNN_noshare_v2(args.num_hops,args.thm_voc_embedsize,args.gnn_layer_size,self.gnn_usebn,self.weight_init)
+            elif args.gnn_module == "GNN_noshare_v3":
+                self.GNN_goal = GNN_noshare_v3(args.num_hops,args.goal_voc_embedsize,args.gnn_layer_size,self.gnn_usebn,self.weight_init)
+                self.GNN_thm = GNN_noshare_v3(args.num_hops,args.thm_voc_embedsize,args.gnn_layer_size,self.gnn_usebn,self.weight_init)
             else:
                 raise RuntimeError('unknown gnn type')
         else:
@@ -643,7 +704,10 @@ class GNN_net(nn.Module):
                 self.neck_thm = Neck(args.gnn_layer_size[-1],args.neck_layer_size,self.neck_usebn,self.weight_init)
             elif args.neck_module == "neck_exp":
                 self.neck_goal = Neck_exp(args.gnn_layer_size[-1],args.neck_layer_size,self.neck_usebn,self.weight_init)
-                self.neck_thm = Neck_exp(args.gnn_layer_size[-1],args.neck_layer_size,self.neck_usebn,self.weight_init)                   
+                self.neck_thm = Neck_exp(args.gnn_layer_size[-1],args.neck_layer_size,self.neck_usebn,self.weight_init)
+            elif args.neck_module == "neck_bow":
+                self.neck_goal = Neck_bow()
+                self.neck_thm = Neck_bow()                 
             else:
                 raise RuntimeError('unknown neck type')
         else:
