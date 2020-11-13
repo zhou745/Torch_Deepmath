@@ -662,8 +662,13 @@ class GNN_net(nn.Module):
         self.embed_init = args.embed_init if hasattr(args, 'embed_init') else None
         self.weight_init = args.weight_init if hasattr(args, 'weight_init') else None
 
-        self.goal_embed=Tokenstore(args.goal_voc_length,args.goal_voc_embedsize,args.use_embed,args.max_norm,self.embed_init)
-        self.thm_embed=Tokenstore(args.thm_voc_length,args.thm_voc_embedsize,args.use_embed,args.max_norm,self.embed_init)
+        self.share_embed = args.share_embed if hasattr(args,'share_embed') else False
+
+        if self.share_embed:
+            self.goal_thm_embed=Tokenstore(args.goal_thm_voc_length,args.goal_thm_voc_embedsize,args.use_embed,args.max_norm,self.embed_init)
+        else:
+            self.goal_embed=Tokenstore(args.goal_voc_length,args.goal_voc_embedsize,args.use_embed,args.max_norm,self.embed_init)
+            self.thm_embed=Tokenstore(args.thm_voc_length,args.thm_voc_embedsize,args.use_embed,args.max_norm,self.embed_init)
 
         self.num_hops = args.num_hops
 
@@ -810,16 +815,25 @@ class GNN_net(nn.Module):
                 input['goal_token'][mask_id_goal]=1
                 input['thm_token'][mask_id_thm]=1
 
-        batch_goal_token = self.goal_embed(input['goal_token'])
-        batch_thm_token = self.thm_embed(input['thm_token'])
+        device = input['goal_token'].device
 
-        device = batch_goal_token.device
+        if self.share_embed:
+            batch_goal_token = self.goal_thm_embed(input['goal_token'])
+            batch_thm_token = self.goal_thm_embed(input['thm_token'])
+            goal_start_token = self.goal_thm_embed.get_start_token(device).view(1,-1)
+            goal_end_token = self.goal_thm_embed.get_end_token(device).view(1,-1)
 
-        goal_start_token = self.goal_embed.get_start_token(device).view(1,-1)
-        goal_end_token = self.goal_embed.get_end_token(device).view(1,-1)
+            thm_start_token = self.goal_thm_embed.get_start_token(device).view(1,-1)
+            thm_end_token = self.goal_thm_embed.get_end_token(device).view(1,-1)
+        else:
+            batch_goal_token = self.goal_embed(input['goal_token'])
+            batch_thm_token = self.thm_embed(input['thm_token'])
+            goal_start_token = self.goal_embed.get_start_token(device).view(1,-1)
+            goal_end_token = self.goal_embed.get_end_token(device).view(1,-1)
 
-        thm_start_token = self.thm_embed.get_start_token(device).view(1,-1)
-        thm_end_token = self.thm_embed.get_end_token(device).view(1,-1)
+            thm_start_token = self.thm_embed.get_start_token(device).view(1,-1)
+            thm_end_token = self.thm_embed.get_end_token(device).view(1,-1)
+
 
         goal_hidden_state = self.GNN_goal(batch_goal_token,
                                             input['goal_edge_p_node'],input['goal_edge_c_node'],

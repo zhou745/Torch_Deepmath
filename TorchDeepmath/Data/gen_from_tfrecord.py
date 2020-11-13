@@ -68,7 +68,7 @@ def GetData_from_TF(files,Queue_raw,num_worker):
         Queue_raw.put("done")
     print("finished read all data from tf record!",flush=True)
 
-def Compute_goal_data(Queue_raw,Queue_new,voc_goal,voc_thm):
+def Compute_goal_data(Queue_raw,Queue_new,voc_goal,voc_thm,goal_thm_voc_dict,share_embed):
 
     while True:
         item = Queue_raw.get()
@@ -78,19 +78,31 @@ def Compute_goal_data(Queue_raw,Queue_new,voc_goal,voc_thm):
         else:
 
             goal_sexp = str(item["goal"].numpy(),encoding="utf-8")
-            goal_dict = Conver2Graph(goal_sexp,voc_goal)
-
+            if share_embed:
+                goal_dict = Conver2Graph(goal_sexp,goal_thm_voc_dict)
+            else:
+                goal_dict = Conver2Graph(goal_sexp,voc_goal)
             thms_dict_list = []
             thms_sexp = item['thms'].numpy()
-            for thm in thms_sexp:
-                thms_dict_list.append(Conver2Graph(str(thm,encoding="utf-8"),voc_thm))
-            if not thms_dict_list:
-                thms_dict_list.append(Conver2Graph("",voc_thm))
             
+            for thm in thms_sexp:
+                if share_embed:
+                    thms_dict_list.append(Conver2Graph(str(thm,encoding="utf-8"),goal_thm_voc_dict))
+                else:
+                    thms_dict_list.append(Conver2Graph(str(thm,encoding="utf-8"),voc_thm))
+            if not thms_dict_list:
+                if share_embed:
+                    thms_dict_list.append(Conver2Graph("",goal_thm_voc_dict))
+                else:
+                    thms_dict_list.append(Conver2Graph("",voc_thm))
+
             neg_thms_dict_list = []
             neg_thms_sexp = item['thms_hard_negatives'].numpy()
             for neg_thm in neg_thms_sexp:
-                neg_thms_dict_list.append(Conver2Graph(str(neg_thm,encoding="utf-8"),voc_thm))
+                if share_embed:
+                    neg_thms_dict_list.append(Conver2Graph(str(neg_thm,encoding="utf-8"),goal_thm_voc_dict))
+                else:
+                    neg_thms_dict_list.append(Conver2Graph(str(neg_thm,encoding="utf-8"),voc_thm))
             
             output = {
                 'goal':goal_dict,
@@ -119,7 +131,7 @@ def Get_data_from_file(files,Queue_raw,num_worker):
         Queue_raw.put("done")
     print("finished read all data from tf record!",flush=True)
 
-def Compute_thm_data(Queue_raw,Queue_new,voc_thm):
+def Compute_thm_data(Queue_raw,Queue_new,voc_thm,goal_thm_voc_dict,share_embed):
     while True:
         item = Queue_raw.get()
         if item == "done":
@@ -127,8 +139,10 @@ def Compute_thm_data(Queue_raw,Queue_new,voc_thm):
             break
         else:
             thm_sexp = item.numpy()
-            thm_dict=Conver2Graph(str(thm_sexp,encoding="utf-8"),voc_thm)
-            
+            if share_embed:
+                thm_dict=Conver2Graph(str(thm_sexp,encoding="utf-8"),goal_thm_voc_dict)
+            else:
+                thm_dict=Conver2Graph(str(thm_sexp,encoding="utf-8"),voc_thm)
             Queue_new.put(thm_dict)
     
     print("one worker finished its job!",flush=True)
@@ -143,19 +157,22 @@ def get_voc(path):
 
     return(voc_dict)
 
-def text_gen(dataset_dir,save_file,num_worker=64):
+def text_gen(dataset_dir,save_file,num_worker=64,share_embed=False):
     path = os.path.join(dataset_dir, 'thms_ls.train')
     files = tf.io.gfile.glob(path)  
     Queue_raw = Queue(512)
     Queue_new = Queue(512)
 
     path_voc_thm = dataset_dir+"/vocab_thms_ls.txt"
+    path_voc_goal_thm = dataset_dir+"/vocab_ls.txt"
     thm_voc_dict = get_voc(path_voc_thm)
+    goal_thm_voc_dict = get_voc(path_voc_goal_thm)
+
 
     process_pool = []
     process_pool.append(Process(target=Get_data_from_file,args=(files,Queue_raw,num_worker)))
     for idx in range(num_worker):
-        process_pool.append(Process(target=Compute_thm_data,args=(Queue_raw,Queue_new,thm_voc_dict)))
+        process_pool.append(Process(target=Compute_thm_data,args=(Queue_raw,Queue_new,thm_voc_dict,goal_thm_voc_dict,share_embed)))
 
     for p in process_pool:
         p.start()
@@ -187,7 +204,7 @@ def text_gen(dataset_dir,save_file,num_worker=64):
     np.save(save_file,reocrd_list)
     print("find %d in total"%(index),flush=True)
 
-def tfgen(dataset_dir,save_file,num_worker=64):
+def tfgen(dataset_dir,save_file,num_worker=64,share_embed=False):
     path = dataset_dir+"/train/tfexamples*"
     files = tf.io.gfile.glob(path)  
     Queue_raw = Queue(512)
@@ -195,14 +212,16 @@ def tfgen(dataset_dir,save_file,num_worker=64):
 
     path_voc_goal = dataset_dir+"/vocab_goal_ls.txt"
     path_voc_thm = dataset_dir+"/vocab_thms_ls.txt"
+    path_voc_goal_thm = dataset_dir+"/vocab_ls.txt"
 
     goal_voc_dict = get_voc(path_voc_goal)
     thm_voc_dict = get_voc(path_voc_thm)
+    goal_thm_voc_dict = get_voc(path_voc_goal_thm)
 
     process_pool = []
     process_pool.append(Process(target=GetData_from_TF,args=(files,Queue_raw,num_worker)))
     for idx in range(num_worker):
-        process_pool.append(Process(target=Compute_goal_data,args=(Queue_raw,Queue_new,goal_voc_dict,thm_voc_dict)))
+        process_pool.append(Process(target=Compute_goal_data,args=(Queue_raw,Queue_new,goal_voc_dict,thm_voc_dict,goal_thm_voc_dict,share_embed)))
 
     for p in process_pool:
         p.start()
@@ -244,6 +263,7 @@ def Conver2Graph(sexp,voc_dict):
             print("find oen",flush=True)
             
         if token not in voc_dict.keys():
+            print("unknown token "+token,flush=True)
             token = "<OBSC>"
         graph_token_idx.append(voc_dict[token])
 

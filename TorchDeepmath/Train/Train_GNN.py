@@ -122,8 +122,6 @@ def model_parallel(rank,pid,dist_url,dataset,model,args):
                         " auc "+str(auc_out.item()),flush=True)
                 step+=1
         dist.barrier()
-        for parameter in model_new.parameters():
-            torch.distributed.broadcast(parameter,0,async_op=False)
 
         if idx%args.decay_rate == (args.decay_rate-1):
             for g in optimizer.param_groups:
@@ -131,7 +129,11 @@ def model_parallel(rank,pid,dist_url,dataset,model,args):
         if rank==0 and idx%args.save_frequency==0:
             torch.save(swa_model.state_dict(), args.save_name+str(idx))
             torch.save(model_new.state_dict(), args.save_name+str(idx)+"_master_copy")
-        idx=idx+1  
+        idx=idx+1
+
+        
+        for parameter in model_new.parameters():
+            torch.distributed.broadcast(parameter,0,async_op=False)
 
     cleanup()
 
@@ -181,8 +183,10 @@ def ValLoop(dataset,model,args):
     device = torch.device('cuda:0')
     model.to(device)
     model.train(False)
-    # print(torch.sum(torch.abs(model.goal_embed.tokenvectors[8,:])),flush=True)
-    # print(torch.sum(torch.abs(model.thm_embed.tokenvectors[8,:])),flush=True)
+    # print(torch.sum(torch.abs(model.goal_embed.tokenvectors.weight[1,:])),flush=True)
+    # print(torch.sum(torch.abs(model.thm_embed.tokenvectors.weight[1,:])),flush=True)
+    # print(torch.sum(torch.abs(model.goal_embed.tokenvectors.weight[8,:])),flush=True)
+    # print(torch.sum(torch.abs(model.thm_embed.tokenvectors.weight[8,:])),flush=True)
     # model.eval()
 
     N_all = 0
